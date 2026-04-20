@@ -23,6 +23,10 @@ Script lines:
 - `search ABC`
 - `clear_search`
 - `finish_and_next`
+- `undo_canvas`
+- `redo_canvas`
+- `undo_path`
+- `redo_path`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`

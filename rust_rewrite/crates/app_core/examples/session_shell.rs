@@ -271,6 +271,22 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             let next = session.finish_selected_glyph_and_select_next_unfinished()?;
             println!("Script finish_and_next @ line {line_no}: {:?}", next);
         }
+        "undo_canvas" => {
+            let changed = session.undo_canvas()?;
+            println!("Script undo_canvas @ line {line_no}: {}", changed);
+        }
+        "redo_canvas" => {
+            let changed = session.redo_canvas()?;
+            println!("Script redo_canvas @ line {line_no}: {}", changed);
+        }
+        "undo_path" => {
+            let changed = session.undo_path_edit()?;
+            println!("Script undo_path @ line {line_no}: {}", changed);
+        }
+        "redo_path" => {
+            let changed = session.redo_path_edit()?;
+            println!("Script redo_path @ line {line_no}: {}", changed);
+        }
         "polygon_sides" => {
             let value = parts
                 .get(1)
@@ -384,7 +400,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | search | clear_search | finish_and_next | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 
