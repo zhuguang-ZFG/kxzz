@@ -183,8 +183,25 @@ impl CanvasPathObject {
     }
 
     pub fn hit_curve_anchor(&self, x: f32, y: f32) -> Option<usize> {
+        self.hit_curve_anchor_with_preferred_anchor(x, y, None)
+    }
+
+    pub fn hit_curve_anchor_with_preferred_anchor(
+        &self,
+        x: f32,
+        y: f32,
+        preferred_anchor: Option<usize>,
+    ) -> Option<usize> {
         if !self.editable_handles {
             return None;
+        }
+
+        if let Some(preferred_anchor) = preferred_anchor {
+            if let Some(point) = self.point_at(preferred_anchor) {
+                if distance(point, (x, y)) <= HANDLE_HIT_RADIUS {
+                    return Some(preferred_anchor);
+                }
+            }
         }
 
         let mut point_index = 0usize;
@@ -215,8 +232,36 @@ impl CanvasPathObject {
     }
 
     pub fn hit_curve_control(&self, x: f32, y: f32) -> Option<CurveHandleHit> {
+        self.hit_curve_control_with_preferred_anchor(x, y, None)
+    }
+
+    pub fn hit_curve_control_with_preferred_anchor(
+        &self,
+        x: f32,
+        y: f32,
+        preferred_anchor: Option<usize>,
+    ) -> Option<CurveHandleHit> {
         if !self.editable_handles {
             return None;
+        }
+
+        if let Some(preferred_anchor) = preferred_anchor {
+            let handles = self.curve_handle_points();
+            for handle in handles {
+                if !matches!(handle.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
+                    continue;
+                }
+                if handle.linked_anchor_index != preferred_anchor {
+                    continue;
+                }
+                if distance((handle.x, handle.y), (x, y)) <= HANDLE_HIT_RADIUS {
+                    return Some(CurveHandleHit {
+                        point_index: handle.point_index,
+                        linked_anchor_index: handle.linked_anchor_index,
+                        role: handle.role,
+                    });
+                }
+            }
         }
 
         let mut point_index = 0usize;

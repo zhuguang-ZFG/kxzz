@@ -71,7 +71,13 @@ impl CanvasInteractionState {
             return;
         }
 
-        if let Some((object_index, hit)) = find_curve_control_hit(document, self.selected_object, x, y) {
+        if let Some((object_index, hit)) = find_curve_control_hit(
+            document,
+            self.selected_object,
+            self.selected_target,
+            x,
+            y,
+        ) {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
@@ -92,7 +98,7 @@ impl CanvasInteractionState {
         }
 
         if let Some((object_index, point_index)) =
-            find_curve_anchor_hit(document, self.selected_object, x, y)
+            find_curve_anchor_hit(document, self.selected_object, self.selected_target, x, y)
         {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
@@ -132,15 +138,20 @@ impl CanvasInteractionState {
     }
 
     pub fn hover_at(&mut self, document: &CanvasDocument, x: f32, y: f32) -> bool {
-        let next = if let Some((object_index, hit)) =
-            find_curve_control_hit(document, self.selected_object, x, y)
+        let next = if let Some((object_index, hit)) = find_curve_control_hit(
+            document,
+            self.selected_object,
+            self.selected_target,
+            x,
+            y,
+        )
         {
             Some(HoverTarget::CurveControl {
                 object_index,
                 point_index: hit.point_index,
             })
         } else if let Some((object_index, point_index)) =
-            find_curve_anchor_hit(document, self.selected_object, x, y)
+            find_curve_anchor_hit(document, self.selected_object, self.selected_target, x, y)
         {
             Some(HoverTarget::CurveAnchor {
                 object_index,
@@ -299,12 +310,20 @@ impl CanvasInteractionState {
 fn find_curve_control_hit(
     document: &CanvasDocument,
     preferred_object: Option<usize>,
+    preferred_target: Option<HoverTarget>,
     x: f32,
     y: f32,
 ) -> Option<(usize, CurveHandleHit)> {
     for index in prioritized_object_indices(document, preferred_object) {
         let object = &document.objects[index];
-        if let Some(hit) = object.hit_curve_control(x, y) {
+        let preferred_anchor = match preferred_target {
+            Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index,
+            }) if object_index == index => Some(point_index),
+            _ => None,
+        };
+        if let Some(hit) = object.hit_curve_control_with_preferred_anchor(x, y, preferred_anchor) {
             return Some((index, hit));
         }
     }
@@ -314,12 +333,20 @@ fn find_curve_control_hit(
 fn find_curve_anchor_hit(
     document: &CanvasDocument,
     preferred_object: Option<usize>,
+    preferred_target: Option<HoverTarget>,
     x: f32,
     y: f32,
 ) -> Option<(usize, usize)> {
     for index in prioritized_object_indices(document, preferred_object) {
         let object = &document.objects[index];
-        if let Some(point_index) = object.hit_curve_anchor(x, y) {
+        let preferred_anchor = match preferred_target {
+            Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index,
+            }) if object_index == index => Some(point_index),
+            _ => None,
+        };
+        if let Some(point_index) = object.hit_curve_anchor_with_preferred_anchor(x, y, preferred_anchor) {
             return Some((index, point_index));
         }
     }
