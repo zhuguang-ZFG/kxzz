@@ -17,7 +17,7 @@ pub struct FontDraft {
 pub fn create_font(draft: FontDraft) -> GfontFile {
     GfontFile {
         meta: FontMeta {
-            version: 4,
+            version: 8,
             kind: draft.kind,
             name: draft.name,
             author: draft.author,
