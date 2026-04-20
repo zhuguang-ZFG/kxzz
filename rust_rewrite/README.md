@@ -20,6 +20,7 @@ Script lines:
 
 - `tool pen`
 - `glyph A`
+- `select_path 0`
 - `search ABC`
 - `clear_search`
 - `finish_and_next`
@@ -28,6 +29,8 @@ Script lines:
 - `undo_path`
 - `redo_path`
 - `append_style_from_selected`
+- `clear_selected_path`
+- `clear_all_paths`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`

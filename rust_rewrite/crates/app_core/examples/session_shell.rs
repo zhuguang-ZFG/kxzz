@@ -253,6 +253,14 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
                 .ok_or_else(|| anyhow!("line {line_no}: missing glyph value"))?;
             session.select_glyph(value)?;
         }
+        "select_path" => {
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing path index"))?;
+            let index: usize = value.parse()?;
+            session.select_path(index)?;
+            println!("Script select_path @ line {line_no}: {}", index);
+        }
         "search" => {
             let value = parts
                 .get(1)
@@ -293,6 +301,14 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
                 "Script append_style_from_selected @ line {line_no}: {}",
                 next_index
             );
+        }
+        "clear_selected_path" => {
+            session.clear_selected_path()?;
+            println!("Script clear_selected_path @ line {line_no}");
+        }
+        "clear_all_paths" => {
+            session.clear_all_paths()?;
+            println!("Script clear_all_paths @ line {line_no}");
         }
         "polygon_sides" => {
             let value = parts
@@ -407,7 +423,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 
