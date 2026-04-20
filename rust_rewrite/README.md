@@ -40,6 +40,7 @@ Script lines:
 - `move 35 5 down`
 - `release 35 5`
 - `dump`
+- `dump_context`
 - `dump_json snapshot.json`
 - `dump_full_json display.json`
 - `save_font out.gfont`

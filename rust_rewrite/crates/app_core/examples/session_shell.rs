@@ -211,6 +211,56 @@ fn dump_session(session: &FontGlyphSession) {
     println!("active drag: {:?}", display.active_drag);
 }
 
+fn dump_curve_context(session: &FontGlyphSession) {
+    let display = session.display_state();
+    println!("selected target detail: {:?}", display.selected_target);
+    println!("hovered target detail: {:?}", display.hovered_target);
+    println!("selected handles detail:");
+    if display.selected_handles.is_empty() {
+        println!("  (none)");
+    } else {
+        for handle in &display.selected_handles {
+            println!("  {}", format_handle_detail(handle));
+        }
+    }
+    println!("selected guides detail:");
+    if display.selected_guides.is_empty() {
+        println!("  (none)");
+    } else {
+        for guide in &display.selected_guides {
+            println!("  {}", format_guide_detail(guide));
+        }
+    }
+    println!("hovered handle detail:");
+    if let Some(handle) = &display.hovered_handle {
+        println!("  {}", format_handle_detail(handle));
+    } else {
+        println!("  (none)");
+    }
+    println!("hovered guides detail:");
+    if display.hovered_guides.is_empty() {
+        println!("  (none)");
+    } else {
+        for guide in &display.hovered_guides {
+            println!("  {}", format_guide_detail(guide));
+        }
+    }
+}
+
+fn format_handle_detail(handle: &app_core::CurveHandlePoint) -> String {
+    format!(
+        "point={} linked_anchor={} role={:?} x={:.2} y={:.2}",
+        handle.point_index, handle.linked_anchor_index, handle.role, handle.x, handle.y
+    )
+}
+
+fn format_guide_detail(guide: &app_core::CurveGuideLine) -> String {
+    format!(
+        "from={} to={} ({:.2},{:.2}) -> ({:.2},{:.2})",
+        guide.from_point_index, guide.to_point_index, guide.x1, guide.y1, guide.x2, guide.y2
+    )
+}
+
 fn write_snapshot_json(session: &FontGlyphSession, path: &PathBuf) -> Result<()> {
     let snapshot = SessionSnapshot::from_session(session);
     fs::write(path, to_string_pretty(&snapshot)?)?;
@@ -362,6 +412,11 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             println!("Script dump @ line {line_no}:");
             dump_session(session);
         }
+        "dump_context" => {
+            println!();
+            println!("Script dump_context @ line {line_no}:");
+            dump_curve_context(session);
+        }
         "dump_json" => {
             let value = parts
                 .get(1)
@@ -449,7 +504,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | next_glyph | prev_glyph | add_missing_chars | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | delete_selected_object | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | next_glyph | prev_glyph | add_missing_chars | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | delete_selected_object | polygon_sides | press | move | release | dump | dump_context | dump_json | dump_full_json | save_font"
     );
 }
 
