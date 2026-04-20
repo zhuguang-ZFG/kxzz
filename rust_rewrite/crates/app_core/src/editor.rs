@@ -19,6 +19,8 @@ pub struct EditorDisplayState {
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
     pub hovered_target: Option<HoverTarget>,
+    pub hovered_handle: Option<crate::canvas::CurveHandlePoint>,
+    pub hovered_guides: Vec<crate::canvas::CurveGuideLine>,
     pub selected_handles: Vec<crate::canvas::CurveHandlePoint>,
     pub selected_guides: Vec<crate::canvas::CurveGuideLine>,
     pub active_drag: Option<DragTarget>,
@@ -67,6 +69,45 @@ impl EditorCanvasState {
             .and_then(|index| self.document.object(index))
             .map(|object| object.curve_guide_lines())
             .unwrap_or_default();
+        let hovered_handle = self
+            .interaction
+            .hovered_target
+            .and_then(|target| match target {
+                HoverTarget::CurveAnchor { object_index, point_index }
+                | HoverTarget::CurveControl { object_index, point_index } => self
+                    .document
+                    .object(object_index)
+                    .and_then(|object| {
+                        object
+                            .curve_handle_points()
+                            .into_iter()
+                            .find(|handle| handle.point_index == point_index)
+                    }),
+                HoverTarget::Bounds { .. } => None,
+            });
+        let hovered_guides = self
+            .interaction
+            .hovered_target
+            .and_then(|target| match target {
+                HoverTarget::Bounds { object_index }
+                | HoverTarget::CurveAnchor { object_index, .. }
+                | HoverTarget::CurveControl { object_index, .. } => self.document.object(object_index),
+            })
+            .map(|object| {
+                let guides = object.curve_guide_lines();
+                match self.interaction.hovered_target {
+                    Some(HoverTarget::CurveControl { point_index, .. }) => guides
+                        .into_iter()
+                        .filter(|guide| guide.from_point_index == point_index)
+                        .collect(),
+                    Some(HoverTarget::CurveAnchor { point_index, .. }) => guides
+                        .into_iter()
+                        .filter(|guide| guide.to_point_index == point_index)
+                        .collect(),
+                    _ => Vec::new(),
+                }
+            })
+            .unwrap_or_default();
 
         EditorDisplayState {
             document: self.document.clone(),
@@ -74,6 +115,8 @@ impl EditorCanvasState {
             selected_object: self.interaction.selected_object,
             hovered_object: self.interaction.hovered_object,
             hovered_target: self.interaction.hovered_target,
+            hovered_handle,
+            hovered_guides,
             selected_handles,
             selected_guides,
             active_drag: self.interaction.active_drag,
