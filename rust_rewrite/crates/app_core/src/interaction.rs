@@ -1,4 +1,5 @@
 use crate::canvas::{CanvasDocument, CurveHandleHit};
+use crate::history::{CanvasEditSnapshot, CanvasHistory};
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +23,7 @@ pub struct CanvasInteractionState {
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
     pub last_pointer: Option<(f32, f32)>,
+    drag_snapshot_active: bool,
 }
 
 impl Default for CanvasInteractionState {
@@ -31,6 +33,7 @@ impl Default for CanvasInteractionState {
             selected_object: None,
             hovered_object: None,
             last_pointer: None,
+            drag_snapshot_active: false,
         }
     }
 }
@@ -43,11 +46,13 @@ impl CanvasInteractionState {
     pub fn pointer_pressed(
         &mut self,
         document: &CanvasDocument,
+        history: &mut CanvasHistory,
         x: f32,
         y: f32,
         button: PointerButton,
     ) {
         self.last_pointer = Some((x, y));
+        self.drag_snapshot_active = false;
 
         if button == PointerButton::Middle {
             self.active_drag = Some(DragTarget::Pan);
@@ -55,6 +60,8 @@ impl CanvasInteractionState {
         }
 
         if let Some((object_index, hit)) = find_curve_control_hit(document, x, y) {
+            history.push(capture_canvas_snapshot(document));
+            self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
             self.hovered_object = None;
             self.active_drag = Some(DragTarget::CurveControl {
@@ -65,6 +72,8 @@ impl CanvasInteractionState {
         }
 
         if let Some((object_index, point_index)) = find_curve_anchor_hit(document, x, y) {
+            history.push(capture_canvas_snapshot(document));
+            self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
             self.hovered_object = None;
             self.active_drag = Some(DragTarget::CurveAnchor {
@@ -75,6 +84,8 @@ impl CanvasInteractionState {
         }
 
         if let Some(object_index) = find_bounds_hit(document, x, y) {
+            history.push(capture_canvas_snapshot(document));
+            self.drag_snapshot_active = true;
             self.hovered_object = Some(object_index);
             self.active_drag = Some(DragTarget::Bounds { object_index });
             return;
@@ -136,10 +147,31 @@ impl CanvasInteractionState {
     pub fn pointer_released(&mut self) {
         self.active_drag = None;
         self.last_pointer = None;
+        self.drag_snapshot_active = false;
     }
 
     pub fn clear_hover(&mut self) {
         self.hovered_object = None;
+    }
+
+    pub fn can_undo(&self, history: &CanvasHistory) -> bool {
+        history.can_undo()
+    }
+
+    pub fn can_redo(&self, history: &CanvasHistory) -> bool {
+        history.can_redo()
+    }
+
+    pub fn undo(&mut self, document: &mut CanvasDocument, history: &mut CanvasHistory) -> Result<()> {
+        let current = capture_canvas_snapshot(document);
+        let previous = history.undo(current)?;
+        apply_canvas_snapshot(document, previous)
+    }
+
+    pub fn redo(&mut self, document: &mut CanvasDocument, history: &mut CanvasHistory) -> Result<()> {
+        let current = capture_canvas_snapshot(document);
+        let next = history.redo(current)?;
+        apply_canvas_snapshot(document, next)
     }
 }
 
@@ -172,4 +204,14 @@ fn find_bounds_hit(document: &CanvasDocument, x: f32, y: f32) -> Option<usize> {
         }
     }
     None
+}
+
+fn capture_canvas_snapshot(document: &CanvasDocument) -> CanvasEditSnapshot {
+    CanvasEditSnapshot {
+        objects: document.to_chunks(),
+    }
+}
+
+fn apply_canvas_snapshot(document: &mut CanvasDocument, snapshot: CanvasEditSnapshot) -> Result<()> {
+    document.load_chunks(&snapshot.objects)
 }
