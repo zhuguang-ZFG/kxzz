@@ -32,6 +32,7 @@ enum ToolState {
     },
     Line {
         points: Vec<CanvasPoint>,
+        hover: Option<CanvasPoint>,
     },
     Pen {
         nodes: Vec<PenNode>,
@@ -55,7 +56,10 @@ struct PenNode {
 impl ToolSession {
     pub fn new(tool: ToolKind) -> Self {
         let state = match tool {
-            ToolKind::Line => ToolState::Line { points: Vec::new() },
+            ToolKind::Line => ToolState::Line {
+                points: Vec::new(),
+                hover: None,
+            },
             ToolKind::Pen => ToolState::Pen { nodes: Vec::new() },
             _ => ToolState::Idle,
         };
@@ -105,17 +109,29 @@ impl ToolSession {
             ToolKind::Line => {
                 match button {
                     ToolPointerButton::Primary => {
-                        let ToolState::Line { points } = &mut self.state else {
+                        let ToolState::Line { points, hover } = &mut self.state else {
                             return Err(anyhow!("line tool state mismatch"));
                         };
                         points.push(point);
-                        let preview = build_polyline(points)?;
+                        *hover = Some(point);
+                        let preview = build_line_preview(points, *hover)?;
                         self.preview = Some(preview.clone());
                         Ok(Some(preview))
                     }
                     ToolPointerButton::Secondary => {
-                        let committed = self.preview.take();
-                        self.state = ToolState::Line { points: Vec::new() };
+                        let ToolState::Line { points, .. } = &mut self.state else {
+                            return Err(anyhow!("line tool state mismatch"));
+                        };
+                        let committed = if points.is_empty() {
+                            None
+                        } else {
+                            Some(build_polyline(points)?)
+                        };
+                        self.preview = None;
+                        self.state = ToolState::Line {
+                            points: Vec::new(),
+                            hover: None,
+                        };
                         Ok(committed)
                     }
                     ToolPointerButton::Middle => Ok(None),
@@ -147,11 +163,10 @@ impl ToolSession {
                 *preview = build_polygon(*origin, point, sides)?;
                 Ok(Some(preview))
             }
-            (ToolKind::Line, ToolState::Line { points }, Some(preview)) => {
+            (ToolKind::Line, ToolState::Line { points, hover }, Some(preview)) => {
                 if !points.is_empty() {
-                    let mut temp = points.clone();
-                    temp.push(point);
-                    *preview = build_polyline(&temp)?;
+                    *hover = Some(point);
+                    *preview = build_line_preview(points, *hover)?;
                     return Ok(Some(preview));
                 }
                 Ok(None)
@@ -389,6 +404,20 @@ fn build_polyline(points: &[CanvasPoint]) -> Result<CanvasPathObject> {
     }
     let chunk = segments_to_chunk(&segments);
     CanvasPathObject::from_chunk(&chunk)
+}
+
+fn build_line_preview(points: &[CanvasPoint], hover: Option<CanvasPoint>) -> Result<CanvasPathObject> {
+    let mut preview_points = points.to_vec();
+    if let Some(hover) = hover {
+        let should_append = preview_points
+            .last()
+            .map(|last| distance(*last, hover) > f32::EPSILON)
+            .unwrap_or(true);
+        if should_append {
+            preview_points.push(hover);
+        }
+    }
+    build_polyline(&preview_points)
 }
 
 fn build_pen_path(nodes: &[PenNode]) -> Result<CanvasPathObject> {
