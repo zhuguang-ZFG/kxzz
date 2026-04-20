@@ -138,10 +138,13 @@ impl CanvasInteractionState {
     }
 
     pub fn hover_at(&mut self, document: &CanvasDocument, x: f32, y: f32) -> bool {
+        let preferred_target = self
+            .hovered_target
+            .or(self.selected_target);
         let next = if let Some((object_index, hit)) = find_curve_control_hit(
             document,
             self.selected_object,
-            self.selected_target,
+            preferred_target,
             x,
             y,
         )
@@ -151,7 +154,7 @@ impl CanvasInteractionState {
                 point_index: hit.point_index,
             })
         } else if let Some((object_index, point_index)) =
-            find_curve_anchor_hit(document, self.selected_object, self.selected_target, x, y)
+            find_curve_anchor_hit(document, self.selected_object, preferred_target, x, y)
         {
             Some(HoverTarget::CurveAnchor {
                 object_index,
