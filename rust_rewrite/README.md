@@ -14,6 +14,7 @@ Example shell:
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-json snapshot.json`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-full-json display.json`
+- `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --save-font out.gfont`
 
 Script lines:
 
@@ -26,6 +27,7 @@ Script lines:
 - `dump`
 - `dump_json snapshot.json`
 - `dump_full_json display.json`
+- `save_font out.gfont`
 
 Notes:
 

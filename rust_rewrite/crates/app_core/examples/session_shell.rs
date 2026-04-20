@@ -17,6 +17,7 @@ fn main() -> Result<()> {
     let mut script_path = None;
     let mut dump_json_path = None;
     let mut dump_full_json_path = None;
+    let mut save_font_path = None;
     let mut tool = ToolKind::Select;
 
     let mut index = 0usize;
@@ -56,6 +57,13 @@ fn main() -> Result<()> {
                     .get(index)
                     .ok_or_else(|| anyhow!("missing value for --dump-full-json"))?;
                 dump_full_json_path = Some(PathBuf::from(value));
+            }
+            "--save-font" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("missing value for --save-font"))?;
+                save_font_path = Some(PathBuf::from(value));
             }
             "--tool" => {
                 index += 1;
@@ -123,6 +131,10 @@ fn main() -> Result<()> {
     if let Some(path) = dump_full_json_path {
         write_full_display_json(&session, &path)?;
         println!("Wrote full display JSON: {}", path.display());
+    }
+    if let Some(path) = save_font_path {
+        session.save_font_to(&path)?;
+        println!("Saved font: {}", path.display());
     }
 
     Ok(())
@@ -286,6 +298,14 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
                 path.display()
             );
         }
+        "save_font" => {
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing output path"))?;
+            let path = PathBuf::from(value);
+            session.save_font_to(&path)?;
+            println!("Script saved font @ line {line_no}: {}", path.display());
+        }
         other => {
             return Err(anyhow!("line {line_no}: unsupported command: {other}"));
         }
@@ -342,11 +362,11 @@ fn parse_f32(value: Option<&&str>, line_no: usize, field: &str) -> Result<f32> {
 fn print_help() {
     println!("session_shell usage:");
     println!(
-        "  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH] [--dump-json PATH] [--dump-full-json PATH]"
+        "  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH] [--dump-json PATH] [--dump-full-json PATH] [--save-font PATH]"
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json | dump_full_json"
+        "script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 
