@@ -1,6 +1,6 @@
 use crate::canvas::CanvasDocument;
 use crate::history::CanvasHistory;
-use crate::interaction::{CanvasInteractionState, PointerButton};
+use crate::interaction::{CanvasInteractionState, DragTarget, PointerButton};
 use crate::tools::{ToolKind, ToolPointerButton, ToolSession};
 use anyhow::Result;
 
@@ -19,6 +19,7 @@ pub struct EditorDisplayState {
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
     pub selected_handles: Vec<crate::canvas::CurveHandlePoint>,
+    pub active_drag: Option<DragTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +66,7 @@ impl EditorCanvasState {
             selected_object: self.interaction.selected_object,
             hovered_object: self.interaction.hovered_object,
             selected_handles,
+            active_drag: self.interaction.active_drag,
         }
     }
 
