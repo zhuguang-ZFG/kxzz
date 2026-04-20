@@ -1,3 +1,4 @@
+use crate::crypto::{decrypt_header, encrypt_header};
 use crate::error::FontCoreError;
 use crate::io::{
     read_f32, read_i32, read_utf, split_preview_and_zip, write_f32, write_i32, write_utf,
@@ -25,20 +26,23 @@ pub fn parse_gfont(bytes: &[u8]) -> Result<GfontFile> {
     let mut r = Cursor::new(bytes);
     let version = read_i32(&mut r)?;
     let compatibility = compatibility_for_version(version)?;
-    if compatibility != GfontCompatibility::V1To4Plain {
-        return Err(FontCoreError::EncryptedHeaderNotImplemented.into());
-    }
-
-    let internal_name = read_utf(&mut r)?;
-    let kind = FontKind::from_raw(read_i32(&mut r)?);
-    let name = read_utf(&mut r)?;
-    let author = read_utf(&mut r)?;
-    let description = read_utf(&mut r)?;
-    let size = read_i32(&mut r)?;
-    let glyph_count = read_i32(&mut r)?;
-    let vendor = if version >= 2 { Some(read_utf(&mut r)?) } else { None };
-    let password = if version >= 4 { Some(read_utf(&mut r)?) } else { None };
-    let uuid = if version >= 7 { Some(read_utf(&mut r)?) } else { None };
+    let mut header = match compatibility {
+        GfontCompatibility::V1To4Plain => HeaderFields::read_plain(&mut r, version)?,
+        GfontCompatibility::V5To8Encrypted => {
+            let header_len = read_i32(&mut r)?;
+            if header_len <= 0 {
+                bail!("invalid encrypted header length: {header_len}");
+            }
+            let mut encrypted = vec![0u8; header_len as usize];
+            r.read_exact(&mut encrypted)?;
+            let plain = decrypt_header(&encrypted)?;
+            let mut header_reader = Cursor::new(plain);
+            HeaderFields::read_plain(&mut header_reader, version)?
+        }
+        GfontCompatibility::V9Encrypted => {
+            return Err(FontCoreError::EncryptedHeader("v9 gfont header is not implemented yet".into()).into())
+        }
+    };
     let preview_count = read_i32(&mut r)?;
 
     let mut glyphs = HashMap::new();
@@ -54,16 +58,16 @@ pub fn parse_gfont(bytes: &[u8]) -> Result<GfontFile> {
     Ok(GfontFile {
         meta: FontMeta {
             version,
-            kind,
-            name,
-            author,
-            description,
-            internal_name,
-            size,
-            glyph_count,
-            vendor,
-            password,
-            uuid,
+            kind: header.kind,
+            name: header.name,
+            author: header.author,
+            description: header.description,
+            internal_name: header.internal_name,
+            size: header.size,
+            glyph_count: header.glyph_count,
+            vendor: header.vendor.take(),
+            password: header.password.take(),
+            uuid: header.uuid.take(),
             file_path: None,
         },
         glyphs,
@@ -81,13 +85,20 @@ pub fn parse_gfont_file(path: &Path) -> Result<GfontFile> {
 pub fn write_gfont(_file: &GfontFile) -> Result<Vec<u8>> {
     let file = _file;
     let compatibility = compatibility_for_version(file.meta.version)?;
-    if compatibility != GfontCompatibility::V1To4Plain {
-        bail!("only plaintext gfont writing is implemented currently");
-    }
 
     let mut out = Vec::new();
     write_i32(&mut out, file.meta.version)?;
-    write_plain_header(&mut out, file)?;
+    match compatibility {
+        GfontCompatibility::V1To4Plain => write_plain_header(&mut out, file)?,
+        GfontCompatibility::V5To8Encrypted => {
+            let mut header = Vec::new();
+            write_plain_header(&mut header, file)?;
+            let encrypted = encrypt_header(&header);
+            write_i32(&mut out, encrypted.len() as i32)?;
+            out.extend_from_slice(&encrypted);
+        }
+        GfontCompatibility::V9Encrypted => bail!("v9 gfont writing is not implemented currently"),
+    }
 
     let mut glyphs: Vec<&GlyphData> = file.glyphs.values().collect();
     glyphs.sort_by(|a, b| a.key.cmp(&b.key));
@@ -235,8 +246,38 @@ fn encode_glyph_entry_name(key: &str, version: i32) -> String {
         key.to_string()
     } else {
         key.chars()
-            .map(|ch| (ch as u32).to_string())
+            .map(|ch| ch.to_string())
             .collect::<Vec<_>>()
             .join("_")
+    }
+}
+
+struct HeaderFields {
+    internal_name: String,
+    kind: FontKind,
+    name: String,
+    author: String,
+    description: String,
+    size: i32,
+    glyph_count: i32,
+    vendor: Option<String>,
+    password: Option<String>,
+    uuid: Option<String>,
+}
+
+impl HeaderFields {
+    fn read_plain<R: Read>(r: &mut R, version: i32) -> Result<Self> {
+        Ok(Self {
+            internal_name: read_utf(r)?,
+            kind: FontKind::from_raw(read_i32(r)?),
+            name: read_utf(r)?,
+            author: read_utf(r)?,
+            description: read_utf(r)?,
+            size: read_i32(r)?,
+            glyph_count: read_i32(r)?,
+            vendor: if version >= 2 { Some(read_utf(r)?) } else { None },
+            password: if version >= 4 { Some(read_utf(r)?) } else { None },
+            uuid: if version >= 7 { Some(read_utf(r)?) } else { None },
+        })
     }
 }

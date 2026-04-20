@@ -1,4 +1,5 @@
 mod convert;
+mod crypto;
 mod error;
 mod io;
 mod model;
