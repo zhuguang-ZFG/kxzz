@@ -27,6 +27,7 @@ Script lines:
 - `redo_canvas`
 - `undo_path`
 - `redo_path`
+- `append_style_from_selected`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`

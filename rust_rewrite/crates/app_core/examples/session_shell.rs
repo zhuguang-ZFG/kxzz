@@ -287,6 +287,13 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             let changed = session.redo_path_edit()?;
             println!("Script redo_path @ line {line_no}: {}", changed);
         }
+        "append_style_from_selected" => {
+            let next_index = session.append_style_from_selected_path()?;
+            println!(
+                "Script append_style_from_selected @ line {line_no}: {}",
+                next_index
+            );
+        }
         "polygon_sides" => {
             let value = parts
                 .get(1)
@@ -400,7 +407,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 
