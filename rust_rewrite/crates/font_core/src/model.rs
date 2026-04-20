@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+const ENGLISH_TOKEN_SEPARATORS: [char; 15] = [
+    ' ', '?', '\'', '"', ':', ',', '.', '-', '!', ';', '(', ')', '[', ']', '\u{2033}',
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FontKind {
     Chinese2500,
@@ -39,6 +43,10 @@ impl FontKind {
             Self::TraditionalChinese3500 => 6,
             Self::Other(v) => v,
         }
+    }
+
+    pub fn is_word_based(self) -> bool {
+        matches!(self, Self::English)
     }
 }
 
@@ -134,6 +142,10 @@ impl GfontFile {
         self.meta.password = password;
     }
 
+    pub fn tokenize_text(&self, text: &str) -> Vec<String> {
+        tokenize_text_for_kind(self.meta.kind, text)
+    }
+
     pub fn add_missing_tokens_from_text(&mut self, text: &str) {
         for token in self.missing_tokens(text) {
             self.insert_glyph(GlyphData::new(token));
@@ -141,10 +153,60 @@ impl GfontFile {
     }
 
     pub fn missing_tokens(&self, text: &str) -> Vec<String> {
-        text.chars()
-            .map(|ch| ch.to_string())
+        self.tokenize_text(text)
+            .into_iter()
             .filter(|token| !self.has_glyph(token))
             .collect()
+    }
+}
+
+pub fn tokenize_text_for_kind(kind: FontKind, text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+
+    if kind.is_word_based() {
+        let mut current = String::new();
+        let chars: Vec<char> = text.chars().collect();
+        for (index, ch) in chars.iter().copied().enumerate() {
+            if matches!(ch, '\n' | '\r' | '\t' | '\u{000C}') {
+                continue;
+            }
+
+            if !is_english_separator(ch) {
+                current.push(ch);
+            }
+
+            if is_english_separator(ch) || index == chars.len().saturating_sub(1) {
+                if !current.is_empty() {
+                    push_unique(&mut tokens, &current);
+                } else if ch != ' ' {
+                    let punctuation = ch.to_string();
+                    push_unique(&mut tokens, &punctuation);
+                }
+                current.clear();
+            }
+        }
+
+        return tokens;
+    }
+
+    for ch in text.chars() {
+        if matches!(ch, '\n' | '\r' | '\t' | '\u{000C}' | ' ') {
+            continue;
+        }
+        let token = ch.to_string();
+        push_unique(&mut tokens, &token);
+    }
+
+    tokens
+}
+
+fn is_english_separator(ch: char) -> bool {
+    ENGLISH_TOKEN_SEPARATORS.contains(&ch)
+}
+
+fn push_unique(tokens: &mut Vec<String>, value: &str) {
+    if !tokens.iter().any(|existing| existing == value) {
+        tokens.push(value.to_string());
     }
 }
 
