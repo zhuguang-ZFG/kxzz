@@ -1,0 +1,27 @@
+# Probe hover/drag hit preference around dense curve handles.
+# Use with:
+# cargo run -p app_core --example session_shell -- --script scripts\hover_drag_probe.txt
+
+tool pen
+press -30 -20 primary
+move 20 10 up
+move 35 5 down
+release 35 5
+move 80 20 up
+press 80 20 primary
+move 100 40 down
+release 100 40
+press 100 40 secondary
+tool select
+dump
+dump_context
+move 35 5 up
+dump_context
+press 35 5 primary
+dump_context
+move 38 8 down
+dump_context
+release 38 8
+dump_context
+move 20 10 up
+dump_context
