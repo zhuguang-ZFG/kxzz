@@ -339,7 +339,7 @@ impl CanvasPathObject {
 
     pub fn anchor_context_handles(&self, anchor_point_index: usize) -> Vec<CurveHandlePoint> {
         let handles = self.curve_handle_points();
-        let Some(anchor_position) = handles.iter().position(|handle| {
+        let Some(anchor) = handles.iter().find(|handle| {
             handle.point_index == anchor_point_index
                 && matches!(
                     handle.role,
@@ -350,15 +350,19 @@ impl CanvasPathObject {
         };
 
         let mut selected = Vec::new();
-        if let Some(previous) = handles.get(anchor_position.saturating_sub(1)) {
+        if let Some(previous) = handles.iter().find(|handle| {
+            handle.point_index + 1 == anchor_point_index
+                && matches!(handle.role, CurveHandleRole::Control1 | CurveHandleRole::Control2)
+        }) {
             if matches!(previous.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
                 selected.push(previous.clone());
             }
         }
-        if let Some(anchor) = handles.get(anchor_position) {
-            selected.push(anchor.clone());
-        }
-        if let Some(next) = handles.get(anchor_position + 1) {
+        selected.push(anchor.clone());
+        if let Some(next) = handles.iter().find(|handle| {
+            handle.point_index == anchor_point_index + 1
+                && matches!(handle.role, CurveHandleRole::Control1 | CurveHandleRole::Control2)
+        }) {
             if matches!(next.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
                 selected.push(next.clone());
             }
@@ -369,7 +373,11 @@ impl CanvasPathObject {
     pub fn anchor_context_guides(&self, anchor_point_index: usize) -> Vec<CurveGuideLine> {
         self.curve_guide_lines()
             .into_iter()
-            .filter(|guide| guide.to_point_index == anchor_point_index)
+            .filter(|guide| {
+                guide.to_point_index == anchor_point_index
+                    && (guide.from_point_index + 1 == anchor_point_index
+                        || guide.from_point_index == anchor_point_index + 1)
+            })
             .collect()
     }
 
