@@ -2,10 +2,11 @@ use anyhow::{anyhow, Result};
 use font_core::{
     chunk_to_segments, segments_to_chunk, GlyphPathChunk, PathSegment,
 };
+use serde::Serialize;
 
 const HANDLE_HIT_RADIUS: f32 = 5.0;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct CanvasTransformConfig {
     pub canvas_size: f32,
     pub source_font_size: f32,
@@ -32,7 +33,7 @@ impl CanvasTransformConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RectF {
     pub left: f32,
     pub top: f32,
@@ -54,7 +55,7 @@ impl RectF {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum CurveHandleRole {
     SegmentStartAnchor,
     SegmentEndAnchor,
@@ -62,14 +63,14 @@ pub enum CurveHandleRole {
     Control2,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CurveHandleHit {
     pub point_index: usize,
     pub linked_anchor_index: usize,
     pub role: CurveHandleRole,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CurveHandlePoint {
     pub point_index: usize,
     pub linked_anchor_index: usize,
@@ -78,7 +79,7 @@ pub struct CurveHandlePoint {
     pub y: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CurveGuideLine {
     pub from_point_index: usize,
     pub to_point_index: usize,
@@ -88,7 +89,7 @@ pub struct CurveGuideLine {
     pub y2: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CanvasPathObject {
     segments: Vec<PathSegment>,
     pub bounds: Option<RectF>,
@@ -438,7 +439,7 @@ impl Default for CanvasPathObject {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct CanvasDocument {
     pub objects: Vec<CanvasPathObject>,
 }

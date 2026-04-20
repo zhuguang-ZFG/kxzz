@@ -16,6 +16,7 @@ fn main() -> Result<()> {
     let mut glyph = None;
     let mut script_path = None;
     let mut dump_json_path = None;
+    let mut dump_full_json_path = None;
     let mut tool = ToolKind::Select;
 
     let mut index = 0usize;
@@ -48,6 +49,13 @@ fn main() -> Result<()> {
                     .get(index)
                     .ok_or_else(|| anyhow!("missing value for --dump-json"))?;
                 dump_json_path = Some(PathBuf::from(value));
+            }
+            "--dump-full-json" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("missing value for --dump-full-json"))?;
+                dump_full_json_path = Some(PathBuf::from(value));
             }
             "--tool" => {
                 index += 1;
@@ -111,6 +119,10 @@ fn main() -> Result<()> {
     if let Some(path) = dump_json_path {
         write_snapshot_json(&session, &path)?;
         println!("Wrote JSON snapshot: {}", path.display());
+    }
+    if let Some(path) = dump_full_json_path {
+        write_full_display_json(&session, &path)?;
+        println!("Wrote full display JSON: {}", path.display());
     }
 
     Ok(())
@@ -192,6 +204,11 @@ fn write_snapshot_json(session: &FontGlyphSession, path: &PathBuf) -> Result<()>
     Ok(())
 }
 
+fn write_full_display_json(session: &FontGlyphSession, path: &PathBuf) -> Result<()> {
+    fs::write(path, to_string_pretty(&session.display_state())?)?;
+    Ok(())
+}
+
 fn run_script(session: &mut FontGlyphSession, path: &PathBuf) -> Result<()> {
     let source = fs::read_to_string(path)?;
     for (line_no, raw_line) in source.lines().enumerate() {
@@ -258,6 +275,17 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             write_snapshot_json(session, &path)?;
             println!("Script wrote JSON snapshot @ line {line_no}: {}", path.display());
         }
+        "dump_full_json" => {
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing output path"))?;
+            let path = PathBuf::from(value);
+            write_full_display_json(session, &path)?;
+            println!(
+                "Script wrote full display JSON @ line {line_no}: {}",
+                path.display()
+            );
+        }
         other => {
             return Err(anyhow!("line {line_no}: unsupported command: {other}"));
         }
@@ -314,10 +342,12 @@ fn parse_f32(value: Option<&&str>, line_no: usize, field: &str) -> Result<f32> {
 fn print_help() {
     println!("session_shell usage:");
     println!(
-        "  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH] [--dump-json PATH]"
+        "  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH] [--dump-json PATH] [--dump-full-json PATH]"
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
-    println!("script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json");
+    println!(
+        "script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json | dump_full_json"
+    );
 }
 
 #[derive(Debug, Serialize)]

@@ -13,6 +13,7 @@ Example shell:
 - `cargo run -p app_core --example session_shell -- --font path\\to\\font.gfont --glyph A --tool pen`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-json snapshot.json`
+- `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-full-json display.json`
 
 Script lines:
 
@@ -24,6 +25,7 @@ Script lines:
 - `release 35 5`
 - `dump`
 - `dump_json snapshot.json`
+- `dump_full_json display.json`
 
 Notes:
 

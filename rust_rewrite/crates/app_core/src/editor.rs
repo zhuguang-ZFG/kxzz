@@ -3,6 +3,7 @@ use crate::history::CanvasHistory;
 use crate::interaction::{CanvasInteractionState, DragTarget, HoverTarget, PointerButton};
 use crate::tools::{ToolKind, ToolPointerButton, ToolSession};
 use anyhow::Result;
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EditorCanvasState {
@@ -12,7 +13,7 @@ pub struct EditorCanvasState {
     pub polygon_sides: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EditorDisplayState {
     pub document: CanvasDocument,
     pub preview: Option<crate::canvas::CanvasPathObject>,

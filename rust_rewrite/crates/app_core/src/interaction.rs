@@ -1,15 +1,16 @@
 use crate::canvas::{CanvasDocument, CurveHandleHit};
 use crate::history::{CanvasEditSnapshot, CanvasHistory};
 use anyhow::{anyhow, Result};
+use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum PointerButton {
     Primary,
     Middle,
     Secondary,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum DragTarget {
     Pan,
     Bounds { object_index: usize },
@@ -17,7 +18,7 @@ pub enum DragTarget {
     CurveControl { object_index: usize, point_index: usize },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum HoverTarget {
     Bounds { object_index: usize },
     CurveAnchor { object_index: usize, point_index: usize },
