@@ -61,6 +61,10 @@ impl FontGlyphSession {
         self.canvas_state.display_document()
     }
 
+    pub fn display_state(&self) -> crate::editor::EditorDisplayState {
+        self.canvas_state.display_state()
+    }
+
     pub fn tool_preview(&self) -> Option<&crate::canvas::CanvasPathObject> {
         self.canvas_state.tool_preview()
     }

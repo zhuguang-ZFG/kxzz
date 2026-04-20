@@ -12,7 +12,7 @@ pub use canvas::{
     CanvasDocument, CanvasPathObject, CanvasTransformConfig, CurveHandleHit, CurveHandleRole,
     RectF,
 };
-pub use editor::{EditorCanvasState, EditorPointerResult};
+pub use editor::{EditorCanvasState, EditorDisplayState, EditorPointerResult};
 pub use font::{create_font, open_font, save_font, FontDraft};
 pub use history::{CanvasEditSnapshot, CanvasHistory, PathEditSnapshot, PathHistory};
 pub use interaction::{CanvasInteractionState, DragTarget, PointerButton};

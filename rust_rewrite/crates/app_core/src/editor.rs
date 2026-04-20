@@ -13,6 +13,14 @@ pub struct EditorCanvasState {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct EditorDisplayState {
+    pub document: CanvasDocument,
+    pub preview: Option<crate::canvas::CanvasPathObject>,
+    pub selected_object: Option<usize>,
+    pub hovered_object: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum EditorPointerResult {
     None,
     CanvasChanged,
@@ -40,6 +48,15 @@ impl EditorCanvasState {
 
     pub fn tool_preview(&self) -> Option<&crate::canvas::CanvasPathObject> {
         self.active_tool.preview()
+    }
+
+    pub fn display_state(&self) -> EditorDisplayState {
+        EditorDisplayState {
+            document: self.document.clone(),
+            preview: self.active_tool.preview().cloned(),
+            selected_object: self.interaction.selected_object,
+            hovered_object: self.interaction.hovered_object,
+        }
     }
 
     pub fn display_document(&self) -> CanvasDocument {
