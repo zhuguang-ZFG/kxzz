@@ -20,6 +20,8 @@ Script lines:
 
 - `tool pen`
 - `glyph A`
+- `search ABC`
+- `clear_search`
 - `finish_and_next`
 - `press -30 -20 primary`
 - `move 20 10 up`
