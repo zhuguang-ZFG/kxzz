@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use crate::font::save_font;
+use crate::history::{PathEditSnapshot, PathHistory};
 use font_core::{GfontFile, GlyphData, GlyphPathChunk};
 
 const MAX_STYLE_COUNT: usize = 20;
@@ -18,6 +19,7 @@ pub struct FontEditorState {
     pub selected_glyph: Option<String>,
     pub selected_path_index: Option<usize>,
     pub search_mode: bool,
+    pub path_history: PathHistory,
 }
 
 impl FontEditorState {
@@ -30,6 +32,7 @@ impl FontEditorState {
             selected_glyph: None,
             selected_path_index: None,
             search_mode: false,
+            path_history: PathHistory::new(),
         }
     }
 
@@ -40,9 +43,13 @@ impl FontEditorState {
         if !self.font.has_glyph(key) {
             return Err(anyhow!("glyph not found: {key}"));
         }
+        let changed = self.selected_glyph.as_deref() != Some(key);
         self.selected_glyph = Some(key.to_string());
         self.rebuild_path_slots();
         self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
+        if changed {
+            self.path_history.clear();
+        }
         Ok(())
     }
 
@@ -115,6 +122,7 @@ impl FontEditorState {
     }
 
     pub fn replace_selected_path(&mut self, chunk: GlyphPathChunk) -> Result<()> {
+        self.push_history_snapshot()?;
         let index = self
             .selected_path_index
             .ok_or_else(|| anyhow!("no path selected"))?;
@@ -132,6 +140,7 @@ impl FontEditorState {
     }
 
     pub fn clear_selected_path(&mut self) -> Result<()> {
+        self.push_history_snapshot()?;
         let index = self
             .selected_path_index
             .ok_or_else(|| anyhow!("no path selected"))?;
@@ -153,6 +162,7 @@ impl FontEditorState {
             source.clone()
         };
 
+        self.push_history_snapshot()?;
         let next_index = {
             let glyph = self.selected_glyph_mut()?;
             if glyph.path_count() >= MAX_STYLE_COUNT {
@@ -168,6 +178,7 @@ impl FontEditorState {
     }
 
     pub fn append_path(&mut self, chunk: GlyphPathChunk) -> Result<usize> {
+        self.push_history_snapshot()?;
         let glyph = self.selected_glyph_mut()?;
         if glyph.path_count() >= MAX_STYLE_COUNT {
             return Err(anyhow!("path count limit reached: {MAX_STYLE_COUNT}"));
@@ -178,6 +189,35 @@ impl FontEditorState {
         self.rebuild_path_slots();
         self.selected_path_index = Some(next_index);
         Ok(next_index)
+    }
+
+    pub fn clear_all_paths(&mut self) -> Result<()> {
+        self.push_history_snapshot()?;
+        let glyph = self.selected_glyph_mut()?;
+        glyph.chunks.clear();
+        self.rebuild_path_slots();
+        self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
+        Ok(())
+    }
+
+    pub fn can_undo_path_edit(&self) -> bool {
+        self.path_history.can_undo()
+    }
+
+    pub fn can_redo_path_edit(&self) -> bool {
+        self.path_history.can_redo()
+    }
+
+    pub fn undo_path_edit(&mut self) -> Result<()> {
+        let current = self.capture_path_snapshot()?;
+        let previous = self.path_history.undo(current)?;
+        self.apply_path_snapshot(previous)
+    }
+
+    pub fn redo_path_edit(&mut self) -> Result<()> {
+        let current = self.capture_path_snapshot()?;
+        let next = self.path_history.redo(current)?;
+        self.apply_path_snapshot(next)
     }
 
     pub fn finish_selected_glyph_and_select_next_unfinished(&mut self) -> Result<Option<String>> {
@@ -231,6 +271,46 @@ impl FontEditorState {
                 has_data: index < path_count,
             })
             .collect();
+    }
+
+    fn push_history_snapshot(&mut self) -> Result<()> {
+        let snapshot = self.capture_path_snapshot()?;
+        self.path_history.push(snapshot);
+        Ok(())
+    }
+
+    fn capture_path_snapshot(&self) -> Result<PathEditSnapshot> {
+        let glyph_key = self
+            .selected_glyph
+            .clone()
+            .ok_or_else(|| anyhow!("no glyph selected"))?;
+        let glyph = self
+            .font
+            .get_glyph(&glyph_key)
+            .ok_or_else(|| anyhow!("glyph disappeared: {glyph_key}"))?;
+        Ok(PathEditSnapshot {
+            glyph_key,
+            selected_path_index: self.selected_path_index.unwrap_or(0),
+            chunks: glyph.chunks.clone(),
+        })
+    }
+
+    fn apply_path_snapshot(&mut self, snapshot: PathEditSnapshot) -> Result<()> {
+        let glyph = self
+            .font
+            .get_glyph_mut(&snapshot.glyph_key)
+            .ok_or_else(|| anyhow!("glyph disappeared: {}", snapshot.glyph_key))?;
+        glyph.chunks = snapshot.chunks;
+        self.selected_glyph = Some(snapshot.glyph_key);
+        self.rebuild_path_slots();
+        let fallback_index = self.path_slots.first().map(|slot| slot.index);
+        let target_index = if self.path_slots.iter().any(|slot| slot.index == snapshot.selected_path_index) {
+            Some(snapshot.selected_path_index)
+        } else {
+            fallback_index
+        };
+        self.selected_path_index = target_index;
+        Ok(())
     }
 
     fn select_first_visible_glyph(&mut self) {
