@@ -79,8 +79,11 @@ impl CanvasInteractionState {
                 object_index,
                 point_index: hit.linked_anchor_index,
             });
-            self.hovered_object = None;
-            self.hovered_target = None;
+            self.hovered_object = Some(object_index);
+            self.hovered_target = Some(HoverTarget::CurveControl {
+                object_index,
+                point_index: hit.point_index,
+            });
             self.active_drag = Some(DragTarget::CurveControl {
                 object_index,
                 point_index: hit.point_index,
@@ -96,8 +99,11 @@ impl CanvasInteractionState {
                 object_index,
                 point_index,
             });
-            self.hovered_object = None;
-            self.hovered_target = None;
+            self.hovered_object = Some(object_index);
+            self.hovered_target = Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index,
+            });
             self.active_drag = Some(DragTarget::CurveAnchor {
                 object_index,
                 point_index,
@@ -169,7 +175,10 @@ impl CanvasInteractionState {
                     .object_mut(object_index)
                     .ok_or_else(|| anyhow!("canvas object index out of range: {object_index}"))?;
                 object.translate_all_points(dx, dy);
+                self.selected_object = Some(object_index);
+                self.selected_target = Some(HoverTarget::Bounds { object_index });
                 self.hovered_object = Some(object_index);
+                self.hovered_target = Some(HoverTarget::Bounds { object_index });
                 Ok(None)
             }
             Some(DragTarget::CurveAnchor {
@@ -181,6 +190,15 @@ impl CanvasInteractionState {
                     .ok_or_else(|| anyhow!("canvas object index out of range: {object_index}"))?;
                 object.move_curve_anchor_with_neighbors(point_index, dx, dy)?;
                 self.selected_object = Some(object_index);
+                self.selected_target = Some(HoverTarget::CurveAnchor {
+                    object_index,
+                    point_index,
+                });
+                self.hovered_object = Some(object_index);
+                self.hovered_target = Some(HoverTarget::CurveAnchor {
+                    object_index,
+                    point_index,
+                });
                 Ok(None)
             }
             Some(DragTarget::CurveControl {
@@ -192,6 +210,11 @@ impl CanvasInteractionState {
                     .ok_or_else(|| anyhow!("canvas object index out of range: {object_index}"))?;
                 object.move_point(point_index, dx, dy)?;
                 self.selected_object = Some(object_index);
+                self.hovered_object = Some(object_index);
+                self.hovered_target = Some(HoverTarget::CurveControl {
+                    object_index,
+                    point_index,
+                });
                 Ok(None)
             }
             None => Ok(None),
@@ -199,6 +222,8 @@ impl CanvasInteractionState {
     }
 
     pub fn pointer_released(&mut self) {
+        self.hovered_object = None;
+        self.hovered_target = None;
         self.active_drag = None;
         self.last_pointer = None;
         self.drag_snapshot_active = false;
