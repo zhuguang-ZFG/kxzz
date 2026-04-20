@@ -112,16 +112,16 @@ impl EditorCanvasState {
                 | HoverTarget::CurveControl { object_index, .. } => self.document.object(object_index),
             })
             .map(|object| {
-                let guides = object.curve_guide_lines();
                 match self.interaction.hovered_target {
-                    Some(HoverTarget::CurveControl { point_index, .. }) => guides
+                    Some(HoverTarget::CurveControl { point_index, .. }) => object
+                        .curve_handle_points()
                         .into_iter()
-                        .filter(|guide| guide.from_point_index == point_index)
-                        .collect(),
-                    Some(HoverTarget::CurveAnchor { point_index, .. }) => guides
-                        .into_iter()
-                        .filter(|guide| guide.to_point_index == point_index)
-                        .collect(),
+                        .find(|handle| handle.point_index == point_index)
+                        .map(|handle| object.anchor_context_guides(handle.linked_anchor_index))
+                        .unwrap_or_default(),
+                    Some(HoverTarget::CurveAnchor { point_index, .. }) => {
+                        object.anchor_context_guides(point_index)
+                    }
                     _ => Vec::new(),
                 }
             })

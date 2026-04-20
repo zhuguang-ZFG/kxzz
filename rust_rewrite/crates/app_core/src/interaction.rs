@@ -138,12 +138,13 @@ impl CanvasInteractionState {
     }
 
     pub fn hover_at(&mut self, document: &CanvasDocument, x: f32, y: f32) -> bool {
-        let preferred_target = self
-            .hovered_target
-            .or(self.selected_target);
+        let preferred_target = self.hovered_target.or(self.selected_target);
+        let preferred_object = preferred_target
+            .map(hover_target_object_index)
+            .or(self.selected_object);
         let next = if let Some((object_index, hit)) = find_curve_control_hit(
             document,
-            self.selected_object,
+            preferred_object,
             preferred_target,
             x,
             y,
@@ -154,14 +155,14 @@ impl CanvasInteractionState {
                 point_index: hit.point_index,
             })
         } else if let Some((object_index, point_index)) =
-            find_curve_anchor_hit(document, self.selected_object, preferred_target, x, y)
+            find_curve_anchor_hit(document, preferred_object, preferred_target, x, y)
         {
             Some(HoverTarget::CurveAnchor {
                 object_index,
                 point_index,
             })
         } else {
-            find_bounds_hit(document, self.selected_object, x, y)
+            find_bounds_hit(document, preferred_object, x, y)
                 .map(|object_index| HoverTarget::Bounds { object_index })
         };
 
@@ -307,6 +308,14 @@ impl CanvasInteractionState {
         self.hovered_target = None;
         self.last_pointer = None;
         self.drag_snapshot_active = false;
+    }
+}
+
+fn hover_target_object_index(target: HoverTarget) -> usize {
+    match target {
+        HoverTarget::Bounds { object_index }
+        | HoverTarget::CurveAnchor { object_index, .. }
+        | HoverTarget::CurveControl { object_index, .. } => object_index,
     }
 }
 
