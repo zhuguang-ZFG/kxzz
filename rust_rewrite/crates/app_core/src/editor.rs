@@ -16,6 +16,7 @@ pub struct EditorCanvasState {
 pub enum EditorPointerResult {
     None,
     CanvasChanged,
+    PreviewChanged,
     ViewPan { dx: f32, dy: f32 },
 }
 
@@ -35,6 +36,18 @@ impl EditorCanvasState {
             self.interaction.pointer_released();
             self.interaction.clear_hover();
         }
+    }
+
+    pub fn tool_preview(&self) -> Option<&crate::canvas::CanvasPathObject> {
+        self.active_tool.preview()
+    }
+
+    pub fn display_document(&self) -> CanvasDocument {
+        let mut document = self.document.clone();
+        if let Some(preview) = self.active_tool.preview() {
+            document.add_object(preview.clone());
+        }
+        document
     }
 
     pub fn pointer_pressed(
@@ -61,6 +74,7 @@ impl EditorCanvasState {
                 if let Some(object) = created {
                     if self.active_tool.tool != ToolKind::Line && self.active_tool.tool != ToolKind::Pen {
                         history.push(snapshot_canvas(&self.document));
+                        return Ok(EditorPointerResult::PreviewChanged);
                     }
                     if self.active_tool.tool == ToolKind::Line || self.active_tool.tool == ToolKind::Pen {
                         if matches!(tool_button, ToolPointerButton::Secondary) {
@@ -68,6 +82,7 @@ impl EditorCanvasState {
                             self.document.add_object(object);
                             return Ok(EditorPointerResult::CanvasChanged);
                         }
+                        return Ok(EditorPointerResult::PreviewChanged);
                     }
                 }
                 Ok(EditorPointerResult::None)
@@ -94,7 +109,7 @@ impl EditorCanvasState {
             _ => {
                 let changed = self.active_tool.pointer_moved(x, y, button_down)?.is_some();
                 if changed {
-                    Ok(EditorPointerResult::CanvasChanged)
+                    Ok(EditorPointerResult::PreviewChanged)
                 } else {
                     Ok(EditorPointerResult::None)
                 }
@@ -119,7 +134,11 @@ impl EditorCanvasState {
                     self.document.add_object(object);
                     return Ok(EditorPointerResult::CanvasChanged);
                 }
-                Ok(EditorPointerResult::None)
+                if self.active_tool.preview().is_some() {
+                    Ok(EditorPointerResult::PreviewChanged)
+                } else {
+                    Ok(EditorPointerResult::None)
+                }
             }
         }
     }

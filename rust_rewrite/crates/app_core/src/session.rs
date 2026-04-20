@@ -57,6 +57,14 @@ impl FontGlyphSession {
         self.editor_state.selected_path_index
     }
 
+    pub fn display_document(&self) -> crate::canvas::CanvasDocument {
+        self.canvas_state.display_document()
+    }
+
+    pub fn tool_preview(&self) -> Option<&crate::canvas::CanvasPathObject> {
+        self.canvas_state.tool_preview()
+    }
+
     pub fn search(&mut self, text: &str) -> Result<()> {
         self.editor_state.search(text);
         self.reload_canvas_from_selected_glyph()
