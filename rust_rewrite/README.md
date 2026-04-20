@@ -20,6 +20,8 @@ Script lines:
 
 - `tool pen`
 - `glyph A`
+- `next_glyph`
+- `prev_glyph`
 - `add_missing_chars 需要补入的新字`
 - `select_path 0`
 - `search ABC`

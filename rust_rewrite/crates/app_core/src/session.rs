@@ -57,6 +57,22 @@ impl FontGlyphSession {
         self.editor_state.selected_path_index
     }
 
+    pub fn select_next_visible_glyph(&mut self) -> Result<Option<String>> {
+        let next = self.editor_state.select_next_visible_glyph()?;
+        if next.is_some() {
+            self.reload_canvas_from_selected_glyph()?;
+        }
+        Ok(next)
+    }
+
+    pub fn select_previous_visible_glyph(&mut self) -> Result<Option<String>> {
+        let previous = self.editor_state.select_previous_visible_glyph()?;
+        if previous.is_some() {
+            self.reload_canvas_from_selected_glyph()?;
+        }
+        Ok(previous)
+    }
+
     pub fn display_document(&self) -> crate::canvas::CanvasDocument {
         self.canvas_state.display_document()
     }

@@ -81,6 +81,39 @@ impl FontEditorState {
         self.select_first_visible_glyph();
     }
 
+    pub fn select_next_visible_glyph(&mut self) -> Result<Option<String>> {
+        let current = self
+            .selected_glyph
+            .clone()
+            .ok_or_else(|| anyhow!("no glyph selected"))?;
+        let Some(current_index) = self.visible_glyph_keys.iter().position(|key| key == &current) else {
+            return Ok(None);
+        };
+        let Some(next_key) = self.visible_glyph_keys.get(current_index + 1).cloned() else {
+            return Ok(None);
+        };
+        self.select_glyph(&next_key)?;
+        Ok(Some(next_key))
+    }
+
+    pub fn select_previous_visible_glyph(&mut self) -> Result<Option<String>> {
+        let current = self
+            .selected_glyph
+            .clone()
+            .ok_or_else(|| anyhow!("no glyph selected"))?;
+        let Some(current_index) = self.visible_glyph_keys.iter().position(|key| key == &current) else {
+            return Ok(None);
+        };
+        let Some(previous_index) = current_index.checked_sub(1) else {
+            return Ok(None);
+        };
+        let Some(previous_key) = self.visible_glyph_keys.get(previous_index).cloned() else {
+            return Ok(None);
+        };
+        self.select_glyph(&previous_key)?;
+        Ok(Some(previous_key))
+    }
+
     pub fn add_missing_chars_from_text(&mut self, text: &str) {
         self.font.add_missing_tokens_from_text(text);
         if !self.search_mode {
