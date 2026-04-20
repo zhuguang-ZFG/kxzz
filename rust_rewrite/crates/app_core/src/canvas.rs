@@ -79,6 +79,16 @@ pub struct CurveHandlePoint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CurveGuideLine {
+    pub from_point_index: usize,
+    pub to_point_index: usize,
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CanvasPathObject {
     segments: Vec<PathSegment>,
     pub bounds: Option<RectF>,
@@ -294,6 +304,36 @@ impl CanvasPathObject {
         }
 
         handles
+    }
+
+    pub fn curve_guide_lines(&self) -> Vec<CurveGuideLine> {
+        let handles = self.curve_handle_points();
+        let mut guides = Vec::new();
+
+        for handle in &handles {
+            if !matches!(handle.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
+                continue;
+            }
+
+            if let Some(anchor) = handles.iter().find(|candidate| {
+                candidate.point_index == handle.linked_anchor_index
+                    && matches!(
+                        candidate.role,
+                        CurveHandleRole::SegmentStartAnchor | CurveHandleRole::SegmentEndAnchor
+                    )
+            }) {
+                guides.push(CurveGuideLine {
+                    from_point_index: handle.point_index,
+                    to_point_index: anchor.point_index,
+                    x1: handle.x,
+                    y1: handle.y,
+                    x2: anchor.x,
+                    y2: anchor.y,
+                });
+            }
+        }
+
+        guides
     }
 
     pub fn translate_all_points(&mut self, dx: f32, dy: f32) {

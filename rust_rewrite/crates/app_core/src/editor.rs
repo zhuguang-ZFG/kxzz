@@ -19,6 +19,7 @@ pub struct EditorDisplayState {
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
     pub selected_handles: Vec<crate::canvas::CurveHandlePoint>,
+    pub selected_guides: Vec<crate::canvas::CurveGuideLine>,
     pub active_drag: Option<DragTarget>,
 }
 
@@ -59,6 +60,12 @@ impl EditorCanvasState {
             .and_then(|index| self.document.object(index))
             .map(|object| object.curve_handle_points())
             .unwrap_or_default();
+        let selected_guides = self
+            .interaction
+            .selected_object
+            .and_then(|index| self.document.object(index))
+            .map(|object| object.curve_guide_lines())
+            .unwrap_or_default();
 
         EditorDisplayState {
             document: self.document.clone(),
@@ -66,6 +73,7 @@ impl EditorCanvasState {
             selected_object: self.interaction.selected_object,
             hovered_object: self.interaction.hovered_object,
             selected_handles,
+            selected_guides,
             active_drag: self.interaction.active_drag,
         }
     }
