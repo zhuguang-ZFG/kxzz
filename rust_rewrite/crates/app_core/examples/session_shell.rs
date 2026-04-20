@@ -253,6 +253,19 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
                 .ok_or_else(|| anyhow!("line {line_no}: missing glyph value"))?;
             session.select_glyph(value)?;
         }
+        "add_missing_chars" => {
+            let text = line
+                .strip_prefix(command)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("line {line_no}: missing text payload"))?;
+            let added = session.add_missing_chars_from_text(text);
+            println!(
+                "Script add_missing_chars @ line {line_no}: added {}, selected {:?}",
+                added,
+                session.selected_glyph_key()
+            );
+        }
         "select_path" => {
             let value = parts
                 .get(1)
@@ -423,7 +436,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | add_missing_chars | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 

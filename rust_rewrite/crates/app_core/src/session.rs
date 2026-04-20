@@ -79,8 +79,10 @@ impl FontGlyphSession {
         self.reload_canvas_from_selected_glyph()
     }
 
-    pub fn add_missing_chars_from_text(&mut self, text: &str) {
+    pub fn add_missing_chars_from_text(&mut self, text: &str) -> usize {
+        let before = self.editor_state.font.glyphs.len();
         self.editor_state.add_missing_chars_from_text(text);
+        self.editor_state.font.glyphs.len().saturating_sub(before)
     }
 
     pub fn select_path(&mut self, index: usize) -> Result<()> {
