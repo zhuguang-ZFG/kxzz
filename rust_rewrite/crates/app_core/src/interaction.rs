@@ -29,6 +29,7 @@ pub enum HoverTarget {
 pub struct CanvasInteractionState {
     pub active_drag: Option<DragTarget>,
     pub selected_object: Option<usize>,
+    pub selected_target: Option<HoverTarget>,
     pub hovered_object: Option<usize>,
     pub hovered_target: Option<HoverTarget>,
     pub last_pointer: Option<(f32, f32)>,
@@ -40,6 +41,7 @@ impl Default for CanvasInteractionState {
         Self {
             active_drag: None,
             selected_object: None,
+            selected_target: None,
             hovered_object: None,
             hovered_target: None,
             last_pointer: None,
@@ -73,6 +75,10 @@ impl CanvasInteractionState {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
+            self.selected_target = Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index: hit.linked_anchor_index,
+            });
             self.hovered_object = None;
             self.hovered_target = None;
             self.active_drag = Some(DragTarget::CurveControl {
@@ -86,6 +92,10 @@ impl CanvasInteractionState {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
+            self.selected_target = Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index,
+            });
             self.hovered_object = None;
             self.hovered_target = None;
             self.active_drag = Some(DragTarget::CurveAnchor {
@@ -99,6 +109,7 @@ impl CanvasInteractionState {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
+            self.selected_target = Some(HoverTarget::Bounds { object_index });
             self.hovered_object = Some(object_index);
             self.hovered_target = Some(HoverTarget::Bounds { object_index });
             self.active_drag = Some(DragTarget::Bounds { object_index });
@@ -106,6 +117,7 @@ impl CanvasInteractionState {
         }
 
         self.selected_object = None;
+        self.selected_target = None;
         self.hovered_object = None;
         self.hovered_target = None;
         self.active_drag = None;
@@ -208,6 +220,7 @@ impl CanvasInteractionState {
         history.push(capture_canvas_snapshot(document));
         let _ = document.remove_object(object_index)?;
         self.selected_object = None;
+        self.selected_target = None;
         self.hovered_object = None;
         self.hovered_target = None;
         self.active_drag = None;
@@ -227,13 +240,27 @@ impl CanvasInteractionState {
     pub fn undo(&mut self, document: &mut CanvasDocument, history: &mut CanvasHistory) -> Result<()> {
         let current = capture_canvas_snapshot(document);
         let previous = history.undo(current)?;
-        apply_canvas_snapshot(document, previous)
+        apply_canvas_snapshot(document, previous)?;
+        self.clear_document_dependent_state();
+        Ok(())
     }
 
     pub fn redo(&mut self, document: &mut CanvasDocument, history: &mut CanvasHistory) -> Result<()> {
         let current = capture_canvas_snapshot(document);
         let next = history.redo(current)?;
-        apply_canvas_snapshot(document, next)
+        apply_canvas_snapshot(document, next)?;
+        self.clear_document_dependent_state();
+        Ok(())
+    }
+
+    fn clear_document_dependent_state(&mut self) {
+        self.active_drag = None;
+        self.selected_object = None;
+        self.selected_target = None;
+        self.hovered_object = None;
+        self.hovered_target = None;
+        self.last_pointer = None;
+        self.drag_snapshot_active = false;
     }
 }
 

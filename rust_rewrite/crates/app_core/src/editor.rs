@@ -18,6 +18,7 @@ pub struct EditorDisplayState {
     pub document: CanvasDocument,
     pub preview: Option<crate::canvas::CanvasPathObject>,
     pub selected_object: Option<usize>,
+    pub selected_target: Option<HoverTarget>,
     pub hovered_object: Option<usize>,
     pub hovered_target: Option<HoverTarget>,
     pub hovered_handle: Option<crate::canvas::CurveHandlePoint>,
@@ -60,15 +61,40 @@ impl EditorCanvasState {
     pub fn display_state(&self) -> EditorDisplayState {
         let selected_handles = self
             .interaction
-            .selected_object
-            .and_then(|index| self.document.object(index))
-            .map(|object| object.curve_handle_points())
+            .selected_target
+            .and_then(|target| match target {
+                HoverTarget::CurveAnchor {
+                    object_index,
+                    point_index,
+                } => self.document.object(object_index).map(|object| {
+                    object
+                        .curve_handle_points()
+                        .into_iter()
+                        .filter(|handle| {
+                            handle.point_index == point_index
+                                || handle.linked_anchor_index == point_index
+                        })
+                        .collect()
+                }),
+                HoverTarget::Bounds { .. } | HoverTarget::CurveControl { .. } => None,
+            })
             .unwrap_or_default();
         let selected_guides = self
             .interaction
-            .selected_object
-            .and_then(|index| self.document.object(index))
-            .map(|object| object.curve_guide_lines())
+            .selected_target
+            .and_then(|target| match target {
+                HoverTarget::CurveAnchor {
+                    object_index,
+                    point_index,
+                } => self.document.object(object_index).map(|object| {
+                    object
+                        .curve_guide_lines()
+                        .into_iter()
+                        .filter(|guide| guide.to_point_index == point_index)
+                        .collect()
+                }),
+                HoverTarget::Bounds { .. } | HoverTarget::CurveControl { .. } => None,
+            })
             .unwrap_or_default();
         let hovered_handle = self
             .interaction
@@ -114,6 +140,7 @@ impl EditorCanvasState {
             document: self.document.clone(),
             preview: self.active_tool.preview().cloned(),
             selected_object: self.interaction.selected_object,
+            selected_target: self.interaction.selected_target,
             hovered_object: self.interaction.hovered_object,
             hovered_target: self.interaction.hovered_target,
             hovered_handle,

@@ -198,6 +198,7 @@ fn dump_session(session: &FontGlyphSession) {
     println!("document objects: {}", display.document.objects.len());
     println!("preview present: {}", display.preview.is_some());
     println!("selected object: {:?}", display.selected_object);
+    println!("selected target: {:?}", display.selected_target);
     println!("hovered object: {:?}", display.hovered_object);
     println!("hovered target: {:?}", display.hovered_target);
     println!("selected handles: {}", display.selected_handles.len());
@@ -460,6 +461,7 @@ struct SessionSnapshot {
     document_object_count: usize,
     preview_present: bool,
     selected_object: Option<usize>,
+    selected_target: Option<String>,
     hovered_object: Option<usize>,
     hovered_target: Option<String>,
     selected_handle_count: usize,
@@ -479,6 +481,7 @@ impl SessionSnapshot {
             document_object_count: display.document.objects.len(),
             preview_present: display.preview.is_some(),
             selected_object: display.selected_object,
+            selected_target: display.selected_target.map(|value| format!("{value:?}")),
             hovered_object: display.hovered_object,
             hovered_target: display.hovered_target.map(|value| format!("{value:?}")),
             selected_handle_count: display.selected_handles.len(),
