@@ -1,0 +1,11 @@
+[package]
+name = "font_core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+zip.workspace = true
+flate2.workspace = true

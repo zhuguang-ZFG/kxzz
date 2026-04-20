@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "crates/font_core",
+    "crates/app_core",
+    "crates/graph_core",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+flate2 = "1"
