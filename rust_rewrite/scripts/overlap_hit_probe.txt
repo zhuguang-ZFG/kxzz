@@ -1,0 +1,32 @@
+# Probe hit preference when multiple objects overlap.
+# Use with:
+# cargo run -p app_core --example session_shell -- --script scripts\overlap_hit_probe.txt
+
+tool rectangle
+press -60 -60 primary
+move 60 60 down
+release 60 60
+tool circle
+press -40 -40 primary
+move 40 40 down
+release 40 40
+tool select
+dump
+move 0 0 up
+dump_context
+press 0 0 primary
+dump
+dump_context
+move 10 10 down
+dump_context
+release 10 10
+dump
+dump_context
+move 0 0 up
+dump_context
+press 0 0 primary
+dump
+dump_context
+delete_selected_object
+dump
+dump_context

@@ -13,6 +13,7 @@ Example shell:
 - `cargo run -p app_core --example session_shell -- --font path\\to\\font.gfont --glyph A --tool pen`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt`
 - `cargo run -p app_core --example session_shell -- --script scripts\\hover_drag_probe.txt`
+- `cargo run -p app_core --example session_shell -- --script scripts\\overlap_hit_probe.txt`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-json snapshot.json`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-full-json display.json`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --save-font out.gfont`
@@ -52,3 +53,4 @@ Notes:
 - Header crypto for `version >= 5` is intentionally stubbed for now.
 - Rust tooling was not available in the current environment when this was created.
 - `scripts\\hover_drag_probe.txt` is a reusable hit/hover regression probe for dense curve editing.
+- `scripts\\overlap_hit_probe.txt` is a reusable overlap-selection probe for object hit priority.
