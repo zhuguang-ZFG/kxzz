@@ -111,6 +111,14 @@ impl KenjoyDllBackend {
         })
     }
 
+    pub fn extract_from_installed_app_dir(
+        path: impl AsRef<Path>,
+        arch: KenjoyArch,
+        extract_dir: Option<&Path>,
+    ) -> Result<PathBuf> {
+        extract_dll_from_app_dir(path.as_ref(), extract_dir, arch)
+    }
+
     unsafe fn symbol<T>(&self, name: &[u8]) -> Result<libloading::Symbol<'_, T>> {
         self.library
             .get(name)
@@ -145,6 +153,10 @@ impl KenjoyDllBackend {
         self.free_memory(ptr)?;
         Ok(out)
     }
+}
+
+pub fn default_installed_app_dir() -> PathBuf {
+    PathBuf::from(r"C:\Program Files (x86)\奎享字体")
 }
 
 impl NativeAlgorithms for KenjoyDllBackend {
