@@ -11,6 +11,17 @@ Example shell:
 
 - `cargo run -p app_core --example session_shell -- --tool rectangle`
 - `cargo run -p app_core --example session_shell -- --font path\\to\\font.gfont --glyph 我 --tool pen`
+- `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt`
+
+Script lines:
+
+- `tool pen`
+- `glyph 我`
+- `press -30 -20 primary`
+- `move 20 10 up`
+- `move 35 5 down`
+- `release 35 5`
+- `dump`
 
 Notes:
 
