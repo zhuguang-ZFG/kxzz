@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use crate::canvas::CanvasDocument;
 use crate::font::save_font;
 use crate::history::{PathEditSnapshot, PathHistory};
 use font_core::{GfontFile, GlyphData, GlyphPathChunk};
@@ -224,10 +225,34 @@ impl FontEditorState {
         Ok(self.selected_glyph()?.chunks.clone())
     }
 
+    pub fn create_canvas_document_for_selected_glyph(&self) -> Result<CanvasDocument> {
+        let mut document = CanvasDocument::new();
+        document.load_chunks(&self.export_selected_paths()?)?;
+        Ok(document)
+    }
+
     pub fn replace_selected_paths(&mut self, chunks: Vec<GlyphPathChunk>) -> Result<()> {
         self.push_history_snapshot()?;
         let glyph = self.selected_glyph_mut()?;
         glyph.chunks = chunks;
+        self.rebuild_path_slots();
+        self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
+        Ok(())
+    }
+
+    pub fn apply_canvas_document_to_selected_glyph(
+        &mut self,
+        document: &CanvasDocument,
+    ) -> Result<()> {
+        self.replace_selected_paths(document.to_chunks())
+    }
+
+    pub fn sync_selected_glyph_from_canvas_document(
+        &mut self,
+        document: &CanvasDocument,
+    ) -> Result<()> {
+        let glyph = self.selected_glyph_mut()?;
+        glyph.chunks = document.to_chunks();
         self.rebuild_path_slots();
         self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
         Ok(())
