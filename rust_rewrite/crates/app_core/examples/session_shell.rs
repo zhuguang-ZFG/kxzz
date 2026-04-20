@@ -253,6 +253,10 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
                 .ok_or_else(|| anyhow!("line {line_no}: missing glyph value"))?;
             session.select_glyph(value)?;
         }
+        "finish_and_next" => {
+            let next = session.finish_selected_glyph_and_select_next_unfinished()?;
+            println!("Script finish_and_next @ line {line_no}: {:?}", next);
+        }
         "polygon_sides" => {
             let value = parts
                 .get(1)
@@ -366,7 +370,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | finish_and_next | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 

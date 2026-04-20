@@ -20,6 +20,7 @@ Script lines:
 
 - `tool pen`
 - `glyph A`
+- `finish_and_next`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`
