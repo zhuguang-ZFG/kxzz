@@ -3,6 +3,8 @@ use app_core::{
     create_font, open_font, FontDraft, FontGlyphSession, PointerButton, ToolKind,
 };
 use font_core::FontKind;
+use serde::Serialize;
+use serde_json::to_string_pretty;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -13,6 +15,7 @@ fn main() -> Result<()> {
     let mut font_path = None;
     let mut glyph = None;
     let mut script_path = None;
+    let mut dump_json_path = None;
     let mut tool = ToolKind::Select;
 
     let mut index = 0usize;
@@ -38,6 +41,13 @@ fn main() -> Result<()> {
                     .get(index)
                     .ok_or_else(|| anyhow!("missing value for --script"))?;
                 script_path = Some(PathBuf::from(value));
+            }
+            "--dump-json" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("missing value for --dump-json"))?;
+                dump_json_path = Some(PathBuf::from(value));
             }
             "--tool" => {
                 index += 1;
@@ -71,7 +81,7 @@ fn main() -> Result<()> {
                 description: "Minimal shell demo".to_string(),
                 password: None,
             });
-            font.add_missing_tokens_from_text("测试A");
+            font.add_missing_tokens_from_text("demoA");
             font
         }
     };
@@ -97,6 +107,11 @@ fn main() -> Result<()> {
     println!();
     println!("After demo interaction:");
     dump_session(&session);
+
+    if let Some(path) = dump_json_path {
+        write_snapshot_json(&session, &path)?;
+        println!("Wrote JSON snapshot: {}", path.display());
+    }
 
     Ok(())
 }
@@ -163,9 +178,18 @@ fn dump_session(session: &FontGlyphSession) {
     println!("hovered target: {:?}", display.hovered_target);
     println!("selected handles: {}", display.selected_handles.len());
     println!("selected guides: {}", display.selected_guides.len());
-    println!("hovered handle: {:?}", display.hovered_handle.as_ref().map(|handle| handle.point_index));
+    println!(
+        "hovered handle: {:?}",
+        display.hovered_handle.as_ref().map(|handle| handle.point_index)
+    );
     println!("hovered guides: {}", display.hovered_guides.len());
     println!("active drag: {:?}", display.active_drag);
+}
+
+fn write_snapshot_json(session: &FontGlyphSession, path: &PathBuf) -> Result<()> {
+    let snapshot = SessionSnapshot::from_session(session);
+    fs::write(path, to_string_pretty(&snapshot)?)?;
+    Ok(())
 }
 
 fn run_script(session: &mut FontGlyphSession, path: &PathBuf) -> Result<()> {
@@ -189,15 +213,21 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
 
     match command {
         "tool" => {
-            let value = parts.get(1).ok_or_else(|| anyhow!("line {line_no}: missing tool name"))?;
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing tool name"))?;
             session.set_tool(parse_tool(value)?);
         }
         "glyph" => {
-            let value = parts.get(1).ok_or_else(|| anyhow!("line {line_no}: missing glyph value"))?;
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing glyph value"))?;
             session.select_glyph(value)?;
         }
         "polygon_sides" => {
-            let value = parts.get(1).ok_or_else(|| anyhow!("line {line_no}: missing polygon side count"))?;
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing polygon side count"))?;
             session.set_polygon_sides(value.parse()?);
         }
         "press" => {
@@ -219,6 +249,14 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             println!();
             println!("Script dump @ line {line_no}:");
             dump_session(session);
+        }
+        "dump_json" => {
+            let value = parts
+                .get(1)
+                .ok_or_else(|| anyhow!("line {line_no}: missing output path"))?;
+            let path = PathBuf::from(value);
+            write_snapshot_json(session, &path)?;
+            println!("Script wrote JSON snapshot @ line {line_no}: {}", path.display());
         }
         other => {
             return Err(anyhow!("line {line_no}: unsupported command: {other}"));
@@ -275,7 +313,47 @@ fn parse_f32(value: Option<&&str>, line_no: usize, field: &str) -> Result<f32> {
 
 fn print_help() {
     println!("session_shell usage:");
-    println!("  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH]");
+    println!(
+        "  cargo run -p app_core --example session_shell -- [--font PATH] [--glyph TEXT] [--tool NAME] [--script PATH] [--dump-json PATH]"
+    );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
-    println!("script commands: tool | glyph | polygon_sides | press | move | release | dump");
+    println!("script commands: tool | glyph | polygon_sides | press | move | release | dump | dump_json");
+}
+
+#[derive(Debug, Serialize)]
+struct SessionSnapshot {
+    selected_glyph: Option<String>,
+    selected_path_index: Option<usize>,
+    tool: String,
+    document_object_count: usize,
+    preview_present: bool,
+    selected_object: Option<usize>,
+    hovered_object: Option<usize>,
+    hovered_target: Option<String>,
+    selected_handle_count: usize,
+    selected_guide_count: usize,
+    hovered_handle_point_index: Option<usize>,
+    hovered_guide_count: usize,
+    active_drag: Option<String>,
+}
+
+impl SessionSnapshot {
+    fn from_session(session: &FontGlyphSession) -> Self {
+        let display = session.display_state();
+        Self {
+            selected_glyph: session.selected_glyph_key().map(ToOwned::to_owned),
+            selected_path_index: session.selected_path_index(),
+            tool: format!("{:?}", session.canvas_state.active_tool.tool),
+            document_object_count: display.document.objects.len(),
+            preview_present: display.preview.is_some(),
+            selected_object: display.selected_object,
+            hovered_object: display.hovered_object,
+            hovered_target: display.hovered_target.map(|value| format!("{value:?}")),
+            selected_handle_count: display.selected_handles.len(),
+            selected_guide_count: display.selected_guides.len(),
+            hovered_handle_point_index: display.hovered_handle.as_ref().map(|handle| handle.point_index),
+            hovered_guide_count: display.hovered_guides.len(),
+            active_drag: display.active_drag.map(|value| format!("{value:?}")),
+        }
+    }
 }

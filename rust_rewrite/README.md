@@ -1,6 +1,6 @@
 # rust_rewrite
 
-Rust workspace skeleton for the reversed `奎享字体` main program.
+Rust workspace skeleton for the reversed main program.
 
 Current crates:
 
@@ -10,18 +10,20 @@ Current crates:
 Example shell:
 
 - `cargo run -p app_core --example session_shell -- --tool rectangle`
-- `cargo run -p app_core --example session_shell -- --font path\\to\\font.gfont --glyph 我 --tool pen`
+- `cargo run -p app_core --example session_shell -- --font path\\to\\font.gfont --glyph A --tool pen`
 - `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt`
+- `cargo run -p app_core --example session_shell -- --script path\\to\\ops.txt --dump-json snapshot.json`
 
 Script lines:
 
 - `tool pen`
-- `glyph 我`
+- `glyph A`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`
 - `release 35 5`
 - `dump`
+- `dump_json snapshot.json`
 
 Notes:
 
