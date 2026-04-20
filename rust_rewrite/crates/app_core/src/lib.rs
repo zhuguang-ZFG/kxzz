@@ -9,8 +9,8 @@ mod tools;
 mod trace;
 
 pub use canvas::{
-    CanvasDocument, CanvasPathObject, CanvasTransformConfig, CurveHandleHit, CurveHandleRole,
-    RectF,
+    CanvasDocument, CanvasPathObject, CanvasTransformConfig, CurveHandleHit, CurveHandlePoint,
+    CurveHandleRole, RectF,
 };
 pub use editor::{EditorCanvasState, EditorDisplayState, EditorPointerResult};
 pub use font::{create_font, open_font, save_font, FontDraft};

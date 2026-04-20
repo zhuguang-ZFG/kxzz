@@ -18,6 +18,7 @@ pub struct EditorDisplayState {
     pub preview: Option<crate::canvas::CanvasPathObject>,
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
+    pub selected_handles: Vec<crate::canvas::CurveHandlePoint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,11 +52,19 @@ impl EditorCanvasState {
     }
 
     pub fn display_state(&self) -> EditorDisplayState {
+        let selected_handles = self
+            .interaction
+            .selected_object
+            .and_then(|index| self.document.object(index))
+            .map(|object| object.curve_handle_points())
+            .unwrap_or_default();
+
         EditorDisplayState {
             document: self.document.clone(),
             preview: self.active_tool.preview().cloned(),
             selected_object: self.interaction.selected_object,
             hovered_object: self.interaction.hovered_object,
+            selected_handles,
         }
     }
 

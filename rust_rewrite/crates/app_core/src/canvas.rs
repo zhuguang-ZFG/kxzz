@@ -70,6 +70,15 @@ pub struct CurveHandleHit {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CurveHandlePoint {
+    pub point_index: usize,
+    pub linked_anchor_index: usize,
+    pub role: CurveHandleRole,
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CanvasPathObject {
     segments: Vec<PathSegment>,
     pub bounds: Option<RectF>,
@@ -230,6 +239,61 @@ impl CanvasPathObject {
         }
 
         None
+    }
+
+    pub fn curve_handle_points(&self) -> Vec<CurveHandlePoint> {
+        if !self.editable_handles {
+            return Vec::new();
+        }
+
+        let mut handles = Vec::new();
+        let mut point_index = 0usize;
+        for segment in &self.segments {
+            match *segment {
+                PathSegment::MoveTo { x, y } | PathSegment::LineTo { x, y } => {
+                    let role = if point_index == 0 {
+                        CurveHandleRole::SegmentStartAnchor
+                    } else {
+                        CurveHandleRole::SegmentEndAnchor
+                    };
+                    handles.push(CurveHandlePoint {
+                        point_index,
+                        linked_anchor_index: point_index,
+                        role,
+                        x,
+                        y,
+                    });
+                    point_index += 1;
+                }
+                PathSegment::CurveTo { x1, y1, x2, y2, x3, y3 } => {
+                    handles.push(CurveHandlePoint {
+                        point_index,
+                        linked_anchor_index: point_index.saturating_sub(1),
+                        role: CurveHandleRole::Control1,
+                        x: x1,
+                        y: y1,
+                    });
+                    handles.push(CurveHandlePoint {
+                        point_index: point_index + 1,
+                        linked_anchor_index: point_index + 2,
+                        role: CurveHandleRole::Control2,
+                        x: x2,
+                        y: y2,
+                    });
+                    handles.push(CurveHandlePoint {
+                        point_index: point_index + 2,
+                        linked_anchor_index: point_index + 2,
+                        role: CurveHandleRole::SegmentEndAnchor,
+                        x: x3,
+                        y: y3,
+                    });
+                    point_index += 3;
+                }
+                PathSegment::Close => {}
+            }
+        }
+
+        handles
     }
 
     pub fn translate_all_points(&mut self, dx: f32, dy: f32) {
