@@ -337,6 +337,42 @@ impl CanvasPathObject {
         guides
     }
 
+    pub fn anchor_context_handles(&self, anchor_point_index: usize) -> Vec<CurveHandlePoint> {
+        let handles = self.curve_handle_points();
+        let Some(anchor_position) = handles.iter().position(|handle| {
+            handle.point_index == anchor_point_index
+                && matches!(
+                    handle.role,
+                    CurveHandleRole::SegmentStartAnchor | CurveHandleRole::SegmentEndAnchor
+                )
+        }) else {
+            return Vec::new();
+        };
+
+        let mut selected = Vec::new();
+        if let Some(previous) = handles.get(anchor_position.saturating_sub(1)) {
+            if matches!(previous.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
+                selected.push(previous.clone());
+            }
+        }
+        if let Some(anchor) = handles.get(anchor_position) {
+            selected.push(anchor.clone());
+        }
+        if let Some(next) = handles.get(anchor_position + 1) {
+            if matches!(next.role, CurveHandleRole::Control1 | CurveHandleRole::Control2) {
+                selected.push(next.clone());
+            }
+        }
+        selected
+    }
+
+    pub fn anchor_context_guides(&self, anchor_point_index: usize) -> Vec<CurveGuideLine> {
+        self.curve_guide_lines()
+            .into_iter()
+            .filter(|guide| guide.to_point_index == anchor_point_index)
+            .collect()
+    }
+
     pub fn translate_all_points(&mut self, dx: f32, dy: f32) {
         self.translate(dx, dy);
     }

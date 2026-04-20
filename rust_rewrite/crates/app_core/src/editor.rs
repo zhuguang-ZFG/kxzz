@@ -66,16 +66,10 @@ impl EditorCanvasState {
                 HoverTarget::CurveAnchor {
                     object_index,
                     point_index,
-                } => self.document.object(object_index).map(|object| {
-                    object
-                        .curve_handle_points()
-                        .into_iter()
-                        .filter(|handle| {
-                            handle.point_index == point_index
-                                || handle.linked_anchor_index == point_index
-                        })
-                        .collect()
-                }),
+                } => self
+                    .document
+                    .object(object_index)
+                    .map(|object| object.anchor_context_handles(point_index)),
                 HoverTarget::Bounds { .. } | HoverTarget::CurveControl { .. } => None,
             })
             .unwrap_or_default();
@@ -86,13 +80,10 @@ impl EditorCanvasState {
                 HoverTarget::CurveAnchor {
                     object_index,
                     point_index,
-                } => self.document.object(object_index).map(|object| {
-                    object
-                        .curve_guide_lines()
-                        .into_iter()
-                        .filter(|guide| guide.to_point_index == point_index)
-                        .collect()
-                }),
+                } => self
+                    .document
+                    .object(object_index)
+                    .map(|object| object.anchor_context_guides(point_index)),
                 HoverTarget::Bounds { .. } | HoverTarget::CurveControl { .. } => None,
             })
             .unwrap_or_default();
