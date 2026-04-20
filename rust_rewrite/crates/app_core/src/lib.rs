@@ -5,7 +5,10 @@ mod interaction;
 mod state;
 mod trace;
 
-pub use canvas::{CanvasDocument, CanvasPathObject, CurveHandleHit, CurveHandleRole, RectF};
+pub use canvas::{
+    CanvasDocument, CanvasPathObject, CanvasTransformConfig, CurveHandleHit, CurveHandleRole,
+    RectF,
+};
 pub use font::{create_font, open_font, save_font, FontDraft};
 pub use history::{CanvasEditSnapshot, CanvasHistory, PathEditSnapshot, PathHistory};
 pub use interaction::{CanvasInteractionState, DragTarget, PointerButton};

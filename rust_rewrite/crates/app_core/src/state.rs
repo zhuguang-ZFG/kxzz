@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use crate::canvas::CanvasDocument;
+use crate::canvas::{CanvasDocument, CanvasTransformConfig};
 use crate::font::save_font;
 use crate::history::{PathEditSnapshot, PathHistory};
 use font_core::{GfontFile, GlyphData, GlyphPathChunk};
@@ -226,8 +226,15 @@ impl FontEditorState {
     }
 
     pub fn create_canvas_document_for_selected_glyph(&self) -> Result<CanvasDocument> {
+        self.create_canvas_document_for_selected_glyph_with_transform(self.default_canvas_transform())
+    }
+
+    pub fn create_canvas_document_for_selected_glyph_with_transform(
+        &self,
+        config: CanvasTransformConfig,
+    ) -> Result<CanvasDocument> {
         let mut document = CanvasDocument::new();
-        document.load_chunks(&self.export_selected_paths()?)?;
+        document.load_chunks_with_transform(&self.export_selected_paths()?, config)?;
         Ok(document)
     }
 
@@ -244,15 +251,37 @@ impl FontEditorState {
         &mut self,
         document: &CanvasDocument,
     ) -> Result<()> {
-        self.replace_selected_paths(document.to_chunks())
+        self.apply_canvas_document_to_selected_glyph_with_transform(
+            document,
+            self.default_canvas_transform(),
+        )
+    }
+
+    pub fn apply_canvas_document_to_selected_glyph_with_transform(
+        &mut self,
+        document: &CanvasDocument,
+        config: CanvasTransformConfig,
+    ) -> Result<()> {
+        self.replace_selected_paths(document.to_chunks_with_transform(config))
     }
 
     pub fn sync_selected_glyph_from_canvas_document(
         &mut self,
         document: &CanvasDocument,
     ) -> Result<()> {
+        self.sync_selected_glyph_from_canvas_document_with_transform(
+            document,
+            self.default_canvas_transform(),
+        )
+    }
+
+    pub fn sync_selected_glyph_from_canvas_document_with_transform(
+        &mut self,
+        document: &CanvasDocument,
+        config: CanvasTransformConfig,
+    ) -> Result<()> {
         let glyph = self.selected_glyph_mut()?;
-        glyph.chunks = document.to_chunks();
+        glyph.chunks = document.to_chunks_with_transform(config);
         self.rebuild_path_slots();
         self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
         Ok(())
@@ -359,5 +388,9 @@ impl FontEditorState {
         if let Some(first) = self.visible_glyph_keys.first().cloned() {
             let _ = self.select_glyph(&first);
         }
+    }
+
+    fn default_canvas_transform(&self) -> CanvasTransformConfig {
+        CanvasTransformConfig::for_font_size(self.font.meta.size)
     }
 }

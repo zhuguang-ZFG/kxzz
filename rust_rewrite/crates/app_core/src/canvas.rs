@@ -5,6 +5,33 @@ use font_core::{
 
 const HANDLE_HIT_RADIUS: f32 = 5.0;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CanvasTransformConfig {
+    pub canvas_size: f32,
+    pub source_font_size: f32,
+    pub baseline_offset_y: f32,
+    pub editable_handles: bool,
+}
+
+impl CanvasTransformConfig {
+    pub fn for_font_size(source_font_size: i32) -> Self {
+        Self {
+            canvas_size: 300.0,
+            source_font_size: source_font_size.max(1) as f32,
+            baseline_offset_y: 75.0,
+            editable_handles: false,
+        }
+    }
+
+    pub fn load_scale(self) -> f32 {
+        self.canvas_size / self.source_font_size
+    }
+
+    pub fn save_scale(self) -> f32 {
+        self.source_font_size / self.canvas_size
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RectF {
     pub left: f32,
@@ -333,6 +360,24 @@ impl CanvasDocument {
         Ok(())
     }
 
+    pub fn load_chunks_with_transform(
+        &mut self,
+        chunks: &[GlyphPathChunk],
+        config: CanvasTransformConfig,
+    ) -> Result<()> {
+        self.objects = chunks
+            .iter()
+            .cloned()
+            .map(|chunk| transform_chunk_for_canvas_load(chunk, config))
+            .map(|chunk| {
+                let mut object = CanvasPathObject::from_chunk(&chunk)?;
+                object.set_editable_handles(config.editable_handles);
+                Ok(object)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(())
+    }
+
     pub fn add_chunk(&mut self, chunk: GlyphPathChunk) -> Result<usize> {
         let object = CanvasPathObject::from_chunk(&chunk)?;
         self.objects.push(object);
@@ -365,6 +410,14 @@ impl CanvasDocument {
         self.objects
             .iter()
             .map(CanvasPathObject::to_chunk)
+            .filter(|chunk| !chunk.points.is_empty())
+            .collect()
+    }
+
+    pub fn to_chunks_with_transform(&self, config: CanvasTransformConfig) -> Vec<GlyphPathChunk> {
+        self.to_chunks()
+            .into_iter()
+            .map(|chunk| transform_chunk_for_canvas_save(chunk, config))
             .filter(|chunk| !chunk.points.is_empty())
             .collect()
     }
@@ -468,4 +521,30 @@ fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     (dx * dx + dy * dy).sqrt()
+}
+
+fn transform_chunk_for_canvas_load(
+    mut chunk: GlyphPathChunk,
+    config: CanvasTransformConfig,
+) -> GlyphPathChunk {
+    let scale = config.load_scale();
+    for pair in chunk.points.chunks_exact_mut(2) {
+        pair[0] *= scale;
+        pair[1] *= scale;
+        pair[1] += config.baseline_offset_y;
+    }
+    chunk
+}
+
+fn transform_chunk_for_canvas_save(
+    mut chunk: GlyphPathChunk,
+    config: CanvasTransformConfig,
+) -> GlyphPathChunk {
+    let scale = config.save_scale();
+    for pair in chunk.points.chunks_exact_mut(2) {
+        pair[1] -= config.baseline_offset_y;
+        pair[0] *= scale;
+        pair[1] *= scale;
+    }
+    chunk
 }
