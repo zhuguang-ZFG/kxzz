@@ -233,6 +233,17 @@ impl EditorCanvasState {
         }
     }
 
+    pub fn delete_selected_object(
+        &mut self,
+        history: &mut CanvasHistory,
+    ) -> Result<bool> {
+        if self.active_tool.tool != ToolKind::Select {
+            self.active_tool.cancel();
+        }
+        self.interaction
+            .delete_selected_object(&mut self.document, history)
+    }
+
     pub fn undo(&mut self, history: &mut CanvasHistory) -> Result<bool> {
         if self.active_tool.tool != ToolKind::Select {
             self.active_tool.cancel();

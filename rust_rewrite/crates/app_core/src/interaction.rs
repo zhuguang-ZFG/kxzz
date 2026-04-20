@@ -98,12 +98,14 @@ impl CanvasInteractionState {
         if let Some(object_index) = find_bounds_hit(document, x, y) {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
+            self.selected_object = Some(object_index);
             self.hovered_object = Some(object_index);
             self.hovered_target = Some(HoverTarget::Bounds { object_index });
             self.active_drag = Some(DragTarget::Bounds { object_index });
             return;
         }
 
+        self.selected_object = None;
         self.hovered_object = None;
         self.hovered_target = None;
         self.active_drag = None;
@@ -193,6 +195,25 @@ impl CanvasInteractionState {
     pub fn clear_hover(&mut self) {
         self.hovered_object = None;
         self.hovered_target = None;
+    }
+
+    pub fn delete_selected_object(
+        &mut self,
+        document: &mut CanvasDocument,
+        history: &mut CanvasHistory,
+    ) -> Result<bool> {
+        let Some(object_index) = self.selected_object else {
+            return Ok(false);
+        };
+        history.push(capture_canvas_snapshot(document));
+        let _ = document.remove_object(object_index)?;
+        self.selected_object = None;
+        self.hovered_object = None;
+        self.hovered_target = None;
+        self.active_drag = None;
+        self.last_pointer = None;
+        self.drag_snapshot_active = false;
+        Ok(true)
     }
 
     pub fn can_undo(&self, history: &CanvasHistory) -> bool {

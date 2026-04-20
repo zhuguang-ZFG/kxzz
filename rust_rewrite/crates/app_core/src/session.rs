@@ -216,6 +216,17 @@ impl FontGlyphSession {
         Ok(result)
     }
 
+    pub fn delete_selected_canvas_object(&mut self) -> Result<bool> {
+        let changed = self
+            .canvas_state
+            .delete_selected_object(&mut self.canvas_history)?;
+        if changed {
+            self.editor_state
+                .apply_canvas_document_to_selected_glyph(&self.canvas_state.document)?;
+        }
+        Ok(changed)
+    }
+
     pub fn commit_canvas_to_selected_glyph(&mut self) -> Result<()> {
         self.editor_state
             .apply_canvas_document_to_selected_glyph(&self.canvas_state.document)

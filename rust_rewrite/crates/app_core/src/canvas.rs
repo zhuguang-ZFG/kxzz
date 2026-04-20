@@ -503,6 +503,13 @@ impl CanvasDocument {
         Ok(())
     }
 
+    pub fn remove_object(&mut self, index: usize) -> Result<CanvasPathObject> {
+        if index >= self.objects.len() {
+            return Err(anyhow!("canvas object index out of range: {index}"));
+        }
+        Ok(self.objects.remove(index))
+    }
+
     pub fn object(&self, index: usize) -> Option<&CanvasPathObject> {
         self.objects.get(index)
     }

@@ -331,6 +331,10 @@ fn run_script_line(session: &mut FontGlyphSession, line: &str, line_no: usize) -
             session.clear_all_paths()?;
             println!("Script clear_all_paths @ line {line_no}");
         }
+        "delete_selected_object" => {
+            let changed = session.delete_selected_canvas_object()?;
+            println!("Script delete_selected_object @ line {line_no}: {}", changed);
+        }
         "polygon_sides" => {
             let value = parts
                 .get(1)
@@ -444,7 +448,7 @@ fn print_help() {
     );
     println!("tools: select | brush | circle | line | polygon | rectangle | pen");
     println!(
-        "script commands: tool | glyph | next_glyph | prev_glyph | add_missing_chars | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
+        "script commands: tool | glyph | next_glyph | prev_glyph | add_missing_chars | select_path | search | clear_search | finish_and_next | undo_canvas | redo_canvas | undo_path | redo_path | append_style_from_selected | clear_selected_path | clear_all_paths | delete_selected_object | polygon_sides | press | move | release | dump | dump_json | dump_full_json | save_font"
     );
 }
 

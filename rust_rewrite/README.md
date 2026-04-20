@@ -34,6 +34,7 @@ Script lines:
 - `append_style_from_selected`
 - `clear_selected_path`
 - `clear_all_paths`
+- `delete_selected_object`
 - `press -30 -20 primary`
 - `move 20 10 up`
 - `move 35 5 down`
