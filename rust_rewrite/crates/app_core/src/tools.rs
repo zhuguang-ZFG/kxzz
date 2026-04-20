@@ -179,7 +179,10 @@ impl ToolSession {
         match (&self.tool, &mut self.state, &mut self.preview) {
             (ToolKind::Brush, ToolState::Brush { .. }, preview) => {
                 self.state = ToolState::Idle;
-                Ok(preview.clone())
+                if let Some(preview) = preview.as_ref() {
+                    return Ok(Some(finalize_brush_preview(preview)?));
+                }
+                Ok(None)
             }
             (ToolKind::Circle | ToolKind::Rectangle | ToolKind::Polygon, ToolState::Shape { .. }, preview) => {
                 self.state = match self.tool {
@@ -289,6 +292,16 @@ fn update_brush_preview(
     Ok(())
 }
 
+fn finalize_brush_preview(preview: &CanvasPathObject) -> Result<CanvasPathObject> {
+    let points = flatten_path_to_points(preview.segments());
+    if points.len() <= 2 {
+        return build_polyline(&points);
+    }
+
+    let simplified = simplify_polyline(&points, brush_simplify_tolerance());
+    build_polyline(&simplified)
+}
+
 fn build_circle(center: CanvasPoint, edge: CanvasPoint) -> Result<CanvasPathObject> {
     let radius = distance(center, edge);
     let steps = radius.max(1.0) as usize;
@@ -391,6 +404,157 @@ fn distance(a: CanvasPoint, b: CanvasPoint) -> f32 {
     let dx = a.x - b.x;
     let dy = a.y - b.y;
     (dx * dx + dy * dy).sqrt()
+}
+
+fn flatten_path_to_points(segments: &[PathSegment]) -> Vec<CanvasPoint> {
+    let mut points = Vec::new();
+    let mut current = None;
+
+    for segment in segments {
+        match *segment {
+            PathSegment::MoveTo { x, y } => {
+                let point = CanvasPoint { x, y };
+                points.push(point);
+                current = Some(point);
+            }
+            PathSegment::LineTo { x, y } => {
+                let point = CanvasPoint { x, y };
+                points.push(point);
+                current = Some(point);
+            }
+            PathSegment::CurveTo { x1, y1, x2, y2, x3, y3 } => {
+                if let Some(start) = current {
+                    let control1 = CanvasPoint { x: x1, y: y1 };
+                    let control2 = CanvasPoint { x: x2, y: y2 };
+                    let end = CanvasPoint { x: x3, y: y3 };
+                    let steps = cubic_sample_steps(start, control1, control2, end);
+                    for step in 1..=steps {
+                        let t = step as f32 / steps as f32;
+                        points.push(sample_cubic_bezier(start, control1, control2, end, t));
+                    }
+                    current = Some(end);
+                }
+            }
+            PathSegment::Close => {}
+        }
+    }
+
+    dedupe_adjacent_points(points)
+}
+
+fn brush_simplify_tolerance() -> f32 {
+    ((0.1f32 * 0.039_370_08f32 * 96.0f32) * 100.0f32).round() / 100.0f32
+}
+
+fn cubic_sample_steps(
+    start: CanvasPoint,
+    control1: CanvasPoint,
+    control2: CanvasPoint,
+    end: CanvasPoint,
+) -> usize {
+    let approx_length = distance(start, control1) + distance(control1, control2) + distance(control2, end);
+    (approx_length * 3.0).ceil().max(1.0) as usize
+}
+
+fn sample_cubic_bezier(
+    start: CanvasPoint,
+    control1: CanvasPoint,
+    control2: CanvasPoint,
+    end: CanvasPoint,
+    t: f32,
+) -> CanvasPoint {
+    let mt = 1.0 - t;
+    let mt2 = mt * mt;
+    let t2 = t * t;
+    CanvasPoint {
+        x: mt2 * mt * start.x
+            + 3.0 * mt2 * t * control1.x
+            + 3.0 * mt * t2 * control2.x
+            + t2 * t * end.x,
+        y: mt2 * mt * start.y
+            + 3.0 * mt2 * t * control1.y
+            + 3.0 * mt * t2 * control2.y
+            + t2 * t * end.y,
+    }
+}
+
+fn simplify_polyline(points: &[CanvasPoint], epsilon: f32) -> Vec<CanvasPoint> {
+    if points.len() <= 2 {
+        return dedupe_adjacent_points(points.to_vec());
+    }
+
+    let mut keep = vec![false; points.len()];
+    keep[0] = true;
+    keep[points.len() - 1] = true;
+    simplify_polyline_range(points, epsilon, 0, points.len() - 1, &mut keep);
+
+    let simplified: Vec<CanvasPoint> = points
+        .iter()
+        .copied()
+        .zip(keep)
+        .filter_map(|(point, keep)| keep.then_some(point))
+        .collect();
+    dedupe_adjacent_points(simplified)
+}
+
+fn simplify_polyline_range(
+    points: &[CanvasPoint],
+    epsilon: f32,
+    start: usize,
+    end: usize,
+    keep: &mut [bool],
+) {
+    if end <= start + 1 {
+        return;
+    }
+
+    let start_point = points[start];
+    let end_point = points[end];
+    let mut max_distance = -1.0f32;
+    let mut split_index = None;
+
+    for (index, point) in points.iter().enumerate().take(end).skip(start + 1) {
+        let distance = perpendicular_distance(*point, start_point, end_point);
+        if distance > max_distance {
+            max_distance = distance;
+            split_index = Some(index);
+        }
+    }
+
+    if max_distance > epsilon {
+        if let Some(split_index) = split_index {
+            keep[split_index] = true;
+            simplify_polyline_range(points, epsilon, start, split_index, keep);
+            simplify_polyline_range(points, epsilon, split_index, end, keep);
+        }
+    }
+}
+
+fn perpendicular_distance(point: CanvasPoint, line_start: CanvasPoint, line_end: CanvasPoint) -> f32 {
+    let dx = line_end.x - line_start.x;
+    let dy = line_end.y - line_start.y;
+    if dx.abs() < f32::EPSILON && dy.abs() < f32::EPSILON {
+        return distance(point, line_start);
+    }
+
+    let numerator =
+        ((dy * point.x) - (dx * point.y) + (line_end.x * line_start.y) - (line_end.y * line_start.x)).abs();
+    let denominator = (dx * dx + dy * dy).sqrt();
+    numerator / denominator
+}
+
+fn dedupe_adjacent_points(points: Vec<CanvasPoint>) -> Vec<CanvasPoint> {
+    let mut deduped = Vec::with_capacity(points.len());
+    for point in points {
+        let should_push = deduped
+            .last()
+            .map(|last| distance(*last, point) > f32::EPSILON)
+            .unwrap_or(true);
+        if should_push {
+            deduped.push(point);
+        }
+    }
+    deduped
 }
 
 #[allow(dead_code)]
