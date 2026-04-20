@@ -3,6 +3,8 @@ use font_core::{
     chunk_to_segments, segments_to_chunk, GlyphPathChunk, PathSegment,
 };
 
+const HANDLE_HIT_RADIUS: f32 = 5.0;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RectF {
     pub left: f32,
@@ -23,6 +25,21 @@ impl RectF {
     pub fn contains(&self, x: f32, y: f32) -> bool {
         x >= self.left && x < self.right && y >= self.top && y < self.bottom
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurveHandleRole {
+    SegmentStartAnchor,
+    SegmentEndAnchor,
+    Control1,
+    Control2,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurveHandleHit {
+    pub point_index: usize,
+    pub linked_anchor_index: usize,
+    pub role: CurveHandleRole,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +126,178 @@ impl CanvasPathObject {
 
     pub fn set_editable_handles(&mut self, editable: bool) {
         self.editable_handles = editable;
+    }
+
+    pub fn hit_bounds(&self, x: f32, y: f32) -> bool {
+        self.bounds
+            .as_ref()
+            .map(|bounds| bounds.contains(x, y))
+            .unwrap_or(false)
+    }
+
+    pub fn hit_curve_anchor(&self, x: f32, y: f32) -> Option<usize> {
+        if !self.editable_handles {
+            return None;
+        }
+
+        let mut point_index = 0usize;
+        for segment in &self.segments {
+            match segment {
+                PathSegment::MoveTo { .. } | PathSegment::LineTo { .. } => {
+                    point_index += 1;
+                }
+                PathSegment::CurveTo { x3, y3, .. } => {
+                    if distance(self.point_at(point_index + 2)?, (x, y)) <= HANDLE_HIT_RADIUS {
+                        return Some(point_index + 2);
+                    }
+                    if point_index == 1 && distance((self.first_point()?), (x, y)) <= HANDLE_HIT_RADIUS {
+                        return Some(0);
+                    }
+                    let _ = (x3, y3);
+                    point_index += 3;
+                }
+                PathSegment::Close => {}
+            }
+        }
+
+        None
+    }
+
+    pub fn hit_curve_anchor_drag(&self, x: f32, y: f32) -> bool {
+        self.hit_curve_anchor(x, y).is_some()
+    }
+
+    pub fn hit_curve_control(&self, x: f32, y: f32) -> Option<CurveHandleHit> {
+        if !self.editable_handles {
+            return None;
+        }
+
+        let mut point_index = 0usize;
+        for segment in &self.segments {
+            match segment {
+                PathSegment::MoveTo { .. } | PathSegment::LineTo { .. } => {
+                    point_index += 1;
+                }
+                PathSegment::CurveTo { .. } => {
+                    let control1 = self.point_at(point_index)?;
+                    if distance(control1, (x, y)) <= HANDLE_HIT_RADIUS {
+                        return Some(CurveHandleHit {
+                            point_index,
+                            linked_anchor_index: point_index.saturating_sub(1),
+                            role: CurveHandleRole::Control1,
+                        });
+                    }
+
+                    let control2 = self.point_at(point_index + 1)?;
+                    if distance(control2, (x, y)) < HANDLE_HIT_RADIUS {
+                        return Some(CurveHandleHit {
+                            point_index: point_index + 1,
+                            linked_anchor_index: point_index + 2,
+                            role: CurveHandleRole::Control2,
+                        });
+                    }
+                    point_index += 3;
+                }
+                PathSegment::Close => {}
+            }
+        }
+
+        None
+    }
+
+    pub fn translate_all_points(&mut self, dx: f32, dy: f32) {
+        self.translate(dx, dy);
+    }
+
+    pub fn move_point(&mut self, point_index: usize, dx: f32, dy: f32) -> Result<()> {
+        let mut changed = false;
+        let mut current_index = 0usize;
+        for segment in &mut self.segments {
+            match segment {
+                PathSegment::MoveTo { x, y } | PathSegment::LineTo { x, y } => {
+                    if current_index == point_index {
+                        *x += dx;
+                        *y += dy;
+                        changed = true;
+                        break;
+                    }
+                    current_index += 1;
+                }
+                PathSegment::CurveTo { x1, y1, x2, y2, x3, y3 } => {
+                    if current_index == point_index {
+                        *x1 += dx;
+                        *y1 += dy;
+                        changed = true;
+                        break;
+                    }
+                    if current_index + 1 == point_index {
+                        *x2 += dx;
+                        *y2 += dy;
+                        changed = true;
+                        break;
+                    }
+                    if current_index + 2 == point_index {
+                        *x3 += dx;
+                        *y3 += dy;
+                        changed = true;
+                        break;
+                    }
+                    current_index += 3;
+                }
+                PathSegment::Close => {}
+            }
+        }
+
+        if changed {
+            self.after_geometry_changed();
+            Ok(())
+        } else {
+            Err(anyhow!("point index out of range: {point_index}"))
+        }
+    }
+
+    pub fn move_curve_anchor_with_neighbors(&mut self, anchor_index: usize, dx: f32, dy: f32) -> Result<()> {
+        self.move_point(anchor_index, dx, dy)?;
+        if anchor_index > 0 {
+            let _ = self.move_point(anchor_index - 1, dx, dy);
+        }
+        let _ = self.move_point(anchor_index + 1, dx, dy);
+        Ok(())
+    }
+
+    fn point_at(&self, point_index: usize) -> Option<(f32, f32)> {
+        let mut current_index = 0usize;
+        for segment in &self.segments {
+            match *segment {
+                PathSegment::MoveTo { x, y } | PathSegment::LineTo { x, y } => {
+                    if current_index == point_index {
+                        return Some((x, y));
+                    }
+                    current_index += 1;
+                }
+                PathSegment::CurveTo { x1, y1, x2, y2, x3, y3 } => {
+                    let points = [(x1, y1), (x2, y2), (x3, y3)];
+                    for (offset, point) in points.into_iter().enumerate() {
+                        if current_index + offset == point_index {
+                            return Some(point);
+                        }
+                    }
+                    current_index += 3;
+                }
+                PathSegment::Close => {}
+            }
+        }
+        None
+    }
+
+    fn first_point(&self) -> Option<(f32, f32)> {
+        self.point_at(0)
+    }
+
+    fn after_geometry_changed(&mut self) {
+        self.bounds = compute_bounds(&self.segments);
+        self.original_for_scale = None;
+        self.scale_factor = 1.0;
     }
 }
 
@@ -273,4 +462,10 @@ fn scale_segment(segment: PathSegment, factor: f32) -> PathSegment {
         },
         PathSegment::Close => PathSegment::Close,
     }
+}
+
+fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
+    let dx = a.0 - b.0;
+    let dy = a.1 - b.1;
+    (dx * dx + dy * dy).sqrt()
 }
