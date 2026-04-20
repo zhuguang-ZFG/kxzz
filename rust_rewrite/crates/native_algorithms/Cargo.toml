@@ -1,10 +1,9 @@
 [package]
-name = "app_core"
+name = "native_algorithms"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-serde.workspace = true
+thiserror.workspace = true
 font_core = { path = "../font_core" }
-native_algorithms = { path = "../native_algorithms" }

@@ -3,6 +3,7 @@ members = [
     "crates/font_core",
     "crates/app_core",
     "crates/graph_core",
+    "crates/native_algorithms",
 ]
 
 [workspace.package]

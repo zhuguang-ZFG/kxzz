@@ -167,6 +167,19 @@ impl FontEditorState {
         Ok(next_index)
     }
 
+    pub fn append_path(&mut self, chunk: GlyphPathChunk) -> Result<usize> {
+        let glyph = self.selected_glyph_mut()?;
+        if glyph.path_count() >= MAX_STYLE_COUNT {
+            return Err(anyhow!("path count limit reached: {MAX_STYLE_COUNT}"));
+        }
+
+        glyph.push_path(chunk);
+        let next_index = glyph.path_count() - 1;
+        self.rebuild_path_slots();
+        self.selected_path_index = Some(next_index);
+        Ok(next_index)
+    }
+
     pub fn finish_selected_glyph_and_select_next_unfinished(&mut self) -> Result<Option<String>> {
         let current = self
             .selected_glyph
