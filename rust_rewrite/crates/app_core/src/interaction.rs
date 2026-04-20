@@ -17,11 +17,19 @@ pub enum DragTarget {
     CurveControl { object_index: usize, point_index: usize },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoverTarget {
+    Bounds { object_index: usize },
+    CurveAnchor { object_index: usize, point_index: usize },
+    CurveControl { object_index: usize, point_index: usize },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CanvasInteractionState {
     pub active_drag: Option<DragTarget>,
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
+    pub hovered_target: Option<HoverTarget>,
     pub last_pointer: Option<(f32, f32)>,
     drag_snapshot_active: bool,
 }
@@ -32,6 +40,7 @@ impl Default for CanvasInteractionState {
             active_drag: None,
             selected_object: None,
             hovered_object: None,
+            hovered_target: None,
             last_pointer: None,
             drag_snapshot_active: false,
         }
@@ -64,6 +73,7 @@ impl CanvasInteractionState {
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
             self.hovered_object = None;
+            self.hovered_target = None;
             self.active_drag = Some(DragTarget::CurveControl {
                 object_index,
                 point_index: hit.point_index,
@@ -76,6 +86,7 @@ impl CanvasInteractionState {
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
             self.hovered_object = None;
+            self.hovered_target = None;
             self.active_drag = Some(DragTarget::CurveAnchor {
                 object_index,
                 point_index,
@@ -87,12 +98,40 @@ impl CanvasInteractionState {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.hovered_object = Some(object_index);
+            self.hovered_target = Some(HoverTarget::Bounds { object_index });
             self.active_drag = Some(DragTarget::Bounds { object_index });
             return;
         }
 
         self.hovered_object = None;
+        self.hovered_target = None;
         self.active_drag = None;
+    }
+
+    pub fn hover_at(&mut self, document: &CanvasDocument, x: f32, y: f32) -> bool {
+        let next = if let Some((object_index, hit)) = find_curve_control_hit(document, x, y) {
+            Some(HoverTarget::CurveControl {
+                object_index,
+                point_index: hit.point_index,
+            })
+        } else if let Some((object_index, point_index)) = find_curve_anchor_hit(document, x, y) {
+            Some(HoverTarget::CurveAnchor {
+                object_index,
+                point_index,
+            })
+        } else {
+            find_bounds_hit(document, x, y).map(|object_index| HoverTarget::Bounds { object_index })
+        };
+
+        let changed = self.hovered_target != next;
+        self.hovered_target = next;
+        self.hovered_object = match next {
+            Some(HoverTarget::Bounds { object_index })
+            | Some(HoverTarget::CurveAnchor { object_index, .. })
+            | Some(HoverTarget::CurveControl { object_index, .. }) => Some(object_index),
+            None => None,
+        };
+        changed
     }
 
     pub fn pointer_dragged(
@@ -152,6 +191,7 @@ impl CanvasInteractionState {
 
     pub fn clear_hover(&mut self) {
         self.hovered_object = None;
+        self.hovered_target = None;
     }
 
     pub fn can_undo(&self, history: &CanvasHistory) -> bool {

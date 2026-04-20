@@ -1,6 +1,6 @@
 use crate::canvas::CanvasDocument;
 use crate::history::CanvasHistory;
-use crate::interaction::{CanvasInteractionState, DragTarget, PointerButton};
+use crate::interaction::{CanvasInteractionState, DragTarget, HoverTarget, PointerButton};
 use crate::tools::{ToolKind, ToolPointerButton, ToolSession};
 use anyhow::Result;
 
@@ -18,6 +18,7 @@ pub struct EditorDisplayState {
     pub preview: Option<crate::canvas::CanvasPathObject>,
     pub selected_object: Option<usize>,
     pub hovered_object: Option<usize>,
+    pub hovered_target: Option<HoverTarget>,
     pub selected_handles: Vec<crate::canvas::CurveHandlePoint>,
     pub selected_guides: Vec<crate::canvas::CurveGuideLine>,
     pub active_drag: Option<DragTarget>,
@@ -72,6 +73,7 @@ impl EditorCanvasState {
             preview: self.active_tool.preview().cloned(),
             selected_object: self.interaction.selected_object,
             hovered_object: self.interaction.hovered_object,
+            hovered_target: self.interaction.hovered_target,
             selected_handles,
             selected_guides,
             active_drag: self.interaction.active_drag,
@@ -134,7 +136,15 @@ impl EditorCanvasState {
     ) -> Result<EditorPointerResult> {
         match self.active_tool.tool {
             ToolKind::Select => {
-                if !button_down || self.interaction.active_drag.is_none() {
+                if !button_down {
+                    let changed = self.interaction.hover_at(&self.document, x, y);
+                    return if changed {
+                        Ok(EditorPointerResult::PreviewChanged)
+                    } else {
+                        Ok(EditorPointerResult::None)
+                    };
+                }
+                if self.interaction.active_drag.is_none() {
                     return Ok(EditorPointerResult::None);
                 }
                 match self.interaction.pointer_dragged(&mut self.document, x, y)? {

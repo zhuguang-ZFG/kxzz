@@ -15,7 +15,7 @@ pub use canvas::{
 pub use editor::{EditorCanvasState, EditorDisplayState, EditorPointerResult};
 pub use font::{create_font, open_font, save_font, FontDraft};
 pub use history::{CanvasEditSnapshot, CanvasHistory, PathEditSnapshot, PathHistory};
-pub use interaction::{CanvasInteractionState, DragTarget, PointerButton};
+pub use interaction::{CanvasInteractionState, DragTarget, HoverTarget, PointerButton};
 pub use session::FontGlyphSession;
 pub use state::{FontEditorState, GlyphPathSlot};
 pub use tools::{CanvasPoint, ToolKind, ToolPointerButton, ToolSession};
