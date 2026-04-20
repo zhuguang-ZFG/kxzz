@@ -34,8 +34,7 @@ enum ToolState {
         points: Vec<CanvasPoint>,
     },
     Pen {
-        segments: Vec<PenSegment>,
-        current: Option<PenSegment>,
+        nodes: Vec<PenNode>,
     },
 }
 
@@ -46,20 +45,18 @@ pub struct CanvasPoint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct PenSegment {
-    anchor: CanvasPoint,
-    handle_in: Option<CanvasPoint>,
-    handle_out: Option<CanvasPoint>,
+struct PenNode {
+    start_anchor: CanvasPoint,
+    end_anchor: Option<CanvasPoint>,
+    control1: CanvasPoint,
+    control2: Option<CanvasPoint>,
 }
 
 impl ToolSession {
     pub fn new(tool: ToolKind) -> Self {
         let state = match tool {
             ToolKind::Line => ToolState::Line { points: Vec::new() },
-            ToolKind::Pen => ToolState::Pen {
-                segments: Vec::new(),
-                current: None,
-            },
+            ToolKind::Pen => ToolState::Pen { nodes: Vec::new() },
             _ => ToolState::Idle,
         };
 
@@ -159,14 +156,18 @@ impl ToolSession {
                 }
                 Ok(None)
             }
-            (ToolKind::Pen, ToolState::Pen { segments, current }, Some(preview)) => {
-                if button_down {
-                    if let Some(active) = current {
-                        active.handle_out = Some(mirror_point(point, active.anchor));
-                        active.handle_in = Some(point);
-                        *preview = build_pen_path(segments, current.as_ref())?;
-                        return Ok(Some(preview));
+            (ToolKind::Pen, ToolState::Pen { nodes }, Some(preview)) => {
+                if let Some(current) = nodes.last_mut() {
+                    if button_down {
+                        if let Some(end_anchor) = current.end_anchor {
+                            current.control2 = Some(mirror_point(point, end_anchor));
+                        }
+                    } else {
+                        current.end_anchor = Some(point);
+                        current.control2 = Some(point);
                     }
+                    *preview = build_pen_path(nodes)?;
+                    return Ok(Some(preview));
                 }
                 Ok(None)
             }
@@ -174,8 +175,7 @@ impl ToolSession {
         }
     }
 
-    pub fn pointer_released(&mut self, x: f32, y: f32) -> Result<Option<CanvasPathObject>> {
-        let point = CanvasPoint { x, y };
+    pub fn pointer_released(&mut self, _x: f32, _y: f32) -> Result<Option<CanvasPathObject>> {
         match (&self.tool, &mut self.state, &mut self.preview) {
             (ToolKind::Brush, ToolState::Brush { .. }, preview) => {
                 self.state = ToolState::Idle;
@@ -192,14 +192,22 @@ impl ToolSession {
                 };
                 Ok(preview.clone())
             }
-            (ToolKind::Pen, ToolState::Pen { segments, current }, Some(preview)) => {
-                if let Some(active) = current.take() {
-                    let mut finalized = active.clone();
-                    if finalized.handle_in.is_none() {
-                        finalized.handle_in = Some(point);
-                    }
-                    segments.push(finalized);
-                    *preview = build_pen_path(segments, None)?;
+            (ToolKind::Pen, ToolState::Pen { nodes }, Some(preview)) => {
+                let next_placeholder = nodes.last().and_then(|current| {
+                    current.end_anchor.map(|end_anchor| {
+                        let control2 = current.control2.unwrap_or(end_anchor);
+                        PenNode {
+                            start_anchor: end_anchor,
+                            end_anchor: None,
+                            control1: mirror_point(control2, end_anchor),
+                            control2: None,
+                        }
+                    })
+                });
+
+                if let Some(next_placeholder) = next_placeholder {
+                    nodes.push(next_placeholder);
+                    *preview = build_pen_path(nodes)?;
                     return Ok(None);
                 }
                 Ok(None)
@@ -219,30 +227,51 @@ impl ToolSession {
     ) -> Result<Option<CanvasPathObject>> {
         match button {
             ToolPointerButton::Primary => {
-                let ToolState::Pen { segments, current } = &mut self.state else {
+                let ToolState::Pen { nodes } = &mut self.state else {
                     return Err(anyhow!("pen tool state mismatch"));
                 };
 
-                if current.is_some() {
-                    return Ok(None);
-                }
-
-                let segment = PenSegment {
-                    anchor: point,
-                    handle_in: None,
-                    handle_out: None,
+                let created_preview = if nodes.is_empty() {
+                    nodes.push(PenNode {
+                        start_anchor: point,
+                        end_anchor: None,
+                        control1: point,
+                        control2: None,
+                    });
+                    true
+                } else if let Some(current) = nodes.last_mut() {
+                    current.end_anchor = Some(point);
+                    current.control2 = Some(point);
+                    false
+                } else {
+                    false
                 };
-                *current = Some(segment);
-                let preview = build_pen_path(segments, current.as_ref())?;
+
+                let preview = build_pen_path(nodes)?;
                 self.preview = Some(preview.clone());
-                Ok(Some(preview))
+                if created_preview {
+                    Ok(Some(preview))
+                } else {
+                    Ok(None)
+                }
             }
             ToolPointerButton::Secondary => {
-                let committed = self.preview.take();
-                self.state = ToolState::Pen {
-                    segments: Vec::new(),
-                    current: None,
+                let ToolState::Pen { nodes } = &mut self.state else {
+                    return Err(anyhow!("pen tool state mismatch"));
                 };
+
+                if matches!(nodes.last(), Some(node) if node.end_anchor.is_none()) {
+                    nodes.pop();
+                }
+
+                let committed = if nodes.is_empty() {
+                    None
+                } else {
+                    Some(build_pen_path(nodes)?)
+                };
+
+                self.preview = None;
+                self.state = ToolState::Pen { nodes: Vec::new() };
                 Ok(committed)
             }
             ToolPointerButton::Middle => Ok(None),
@@ -362,31 +391,25 @@ fn build_polyline(points: &[CanvasPoint]) -> Result<CanvasPathObject> {
     CanvasPathObject::from_chunk(&chunk)
 }
 
-fn build_pen_path(segments: &[PenSegment], current: Option<&PenSegment>) -> Result<CanvasPathObject> {
+fn build_pen_path(nodes: &[PenNode]) -> Result<CanvasPathObject> {
     let mut path = Vec::new();
-    let all: Vec<&PenSegment> = segments.iter().chain(current.into_iter()).collect();
-    if let Some(first) = all.first() {
+    if let Some(first) = nodes.first() {
         path.push(PathSegment::MoveTo {
-            x: first.anchor.x,
-            y: first.anchor.y,
+            x: first.start_anchor.x,
+            y: first.start_anchor.y,
         });
     }
-    for pair in all.windows(2) {
-        let prev = pair[0];
-        let next = pair[1];
-        match (prev.handle_out, next.handle_in) {
-            (Some(h1), Some(h2)) => path.push(PathSegment::CurveTo {
-                x1: h1.x,
-                y1: h1.y,
-                x2: h2.x,
-                y2: h2.y,
-                x3: next.anchor.x,
-                y3: next.anchor.y,
-            }),
-            _ => path.push(PathSegment::LineTo {
-                x: next.anchor.x,
-                y: next.anchor.y,
-            }),
+
+    for node in nodes {
+        if let (Some(end_anchor), Some(control2)) = (node.end_anchor, node.control2) {
+            path.push(PathSegment::CurveTo {
+                x1: node.control1.x,
+                y1: node.control1.y,
+                x2: control2.x,
+                y2: control2.y,
+                x3: end_anchor.x,
+                y3: end_anchor.y,
+            });
         }
     }
     let chunk = segments_to_chunk(&path);
