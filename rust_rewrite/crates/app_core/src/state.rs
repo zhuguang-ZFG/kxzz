@@ -220,6 +220,19 @@ impl FontEditorState {
         self.apply_path_snapshot(next)
     }
 
+    pub fn export_selected_paths(&self) -> Result<Vec<GlyphPathChunk>> {
+        Ok(self.selected_glyph()?.chunks.clone())
+    }
+
+    pub fn replace_selected_paths(&mut self, chunks: Vec<GlyphPathChunk>) -> Result<()> {
+        self.push_history_snapshot()?;
+        let glyph = self.selected_glyph_mut()?;
+        glyph.chunks = chunks;
+        self.rebuild_path_slots();
+        self.selected_path_index = self.path_slots.first().map(|slot| slot.index);
+        Ok(())
+    }
+
     pub fn finish_selected_glyph_and_select_next_unfinished(&mut self) -> Result<Option<String>> {
         let current = self
             .selected_glyph

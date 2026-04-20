@@ -1,8 +1,10 @@
+mod canvas;
 mod font;
 mod history;
 mod state;
 mod trace;
 
+pub use canvas::{CanvasDocument, CanvasPathObject, RectF};
 pub use font::{create_font, open_font, save_font, FontDraft};
 pub use history::{PathEditSnapshot, PathHistory};
 pub use state::{FontEditorState, GlyphPathSlot};
