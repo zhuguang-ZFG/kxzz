@@ -71,7 +71,7 @@ impl CanvasInteractionState {
             return;
         }
 
-        if let Some((object_index, hit)) = find_curve_control_hit(document, x, y) {
+        if let Some((object_index, hit)) = find_curve_control_hit(document, self.selected_object, x, y) {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
@@ -91,7 +91,9 @@ impl CanvasInteractionState {
             return;
         }
 
-        if let Some((object_index, point_index)) = find_curve_anchor_hit(document, x, y) {
+        if let Some((object_index, point_index)) =
+            find_curve_anchor_hit(document, self.selected_object, x, y)
+        {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
@@ -111,7 +113,7 @@ impl CanvasInteractionState {
             return;
         }
 
-        if let Some(object_index) = find_bounds_hit(document, x, y) {
+        if let Some(object_index) = find_bounds_hit(document, self.selected_object, x, y) {
             history.push(capture_canvas_snapshot(document));
             self.drag_snapshot_active = true;
             self.selected_object = Some(object_index);
@@ -130,18 +132,23 @@ impl CanvasInteractionState {
     }
 
     pub fn hover_at(&mut self, document: &CanvasDocument, x: f32, y: f32) -> bool {
-        let next = if let Some((object_index, hit)) = find_curve_control_hit(document, x, y) {
+        let next = if let Some((object_index, hit)) =
+            find_curve_control_hit(document, self.selected_object, x, y)
+        {
             Some(HoverTarget::CurveControl {
                 object_index,
                 point_index: hit.point_index,
             })
-        } else if let Some((object_index, point_index)) = find_curve_anchor_hit(document, x, y) {
+        } else if let Some((object_index, point_index)) =
+            find_curve_anchor_hit(document, self.selected_object, x, y)
+        {
             Some(HoverTarget::CurveAnchor {
                 object_index,
                 point_index,
             })
         } else {
-            find_bounds_hit(document, x, y).map(|object_index| HoverTarget::Bounds { object_index })
+            find_bounds_hit(document, self.selected_object, x, y)
+                .map(|object_index| HoverTarget::Bounds { object_index })
         };
 
         let changed = self.hovered_target != next;
@@ -291,10 +298,12 @@ impl CanvasInteractionState {
 
 fn find_curve_control_hit(
     document: &CanvasDocument,
+    preferred_object: Option<usize>,
     x: f32,
     y: f32,
 ) -> Option<(usize, CurveHandleHit)> {
-    for (index, object) in document.objects.iter().enumerate() {
+    for index in prioritized_object_indices(document, preferred_object) {
+        let object = &document.objects[index];
         if let Some(hit) = object.hit_curve_control(x, y) {
             return Some((index, hit));
         }
@@ -302,8 +311,14 @@ fn find_curve_control_hit(
     None
 }
 
-fn find_curve_anchor_hit(document: &CanvasDocument, x: f32, y: f32) -> Option<(usize, usize)> {
-    for (index, object) in document.objects.iter().enumerate() {
+fn find_curve_anchor_hit(
+    document: &CanvasDocument,
+    preferred_object: Option<usize>,
+    x: f32,
+    y: f32,
+) -> Option<(usize, usize)> {
+    for index in prioritized_object_indices(document, preferred_object) {
+        let object = &document.objects[index];
         if let Some(point_index) = object.hit_curve_anchor(x, y) {
             return Some((index, point_index));
         }
@@ -311,13 +326,31 @@ fn find_curve_anchor_hit(document: &CanvasDocument, x: f32, y: f32) -> Option<(u
     None
 }
 
-fn find_bounds_hit(document: &CanvasDocument, x: f32, y: f32) -> Option<usize> {
-    for (index, object) in document.objects.iter().enumerate() {
+fn find_bounds_hit(
+    document: &CanvasDocument,
+    preferred_object: Option<usize>,
+    x: f32,
+    y: f32,
+) -> Option<usize> {
+    for index in prioritized_object_indices(document, preferred_object) {
+        let object = &document.objects[index];
         if object.hit_bounds(x, y) {
             return Some(index);
         }
     }
     None
+}
+
+fn prioritized_object_indices(
+    document: &CanvasDocument,
+    preferred_object: Option<usize>,
+) -> Vec<usize> {
+    let mut indices: Vec<usize> = (0..document.objects.len()).collect();
+    if let Some(preferred_index) = preferred_object.filter(|index| *index < document.objects.len()) {
+        indices.retain(|index| *index != preferred_index);
+        indices.insert(0, preferred_index);
+    }
+    indices
 }
 
 fn capture_canvas_snapshot(document: &CanvasDocument) -> CanvasEditSnapshot {
